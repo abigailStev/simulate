@@ -105,14 +105,15 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, noisy):
 if __name__ == "__main__":
 	"""
 	"""
-	dt = 1.0/2048.0  # The timestep or amount of time per bin, in seconds.
+	dt = 1.0 / 8192.0  # The timestep or amount of time per bin, in seconds.
 	n_bins = 128  # Number of bins in one light curve (assuming both curves are 
 				  # of same length).
+# 	n_bins = 32768
 	freq = 401.0  # Frequency of sine wave signals, in Hz. Works well when this 	
 				  # is a power of 2 (otherwise we get aliasing). Assuming that 
 				  # the signals of both light curves have the same frequency.
-	amp_ci = 40000.0  # Amplitude of sine wave signal for ci
-	amp_ref = 30000.0  # Amplitude of sine wave signal for ref
+	amp_ci = 100.0  # Amplitude of sine wave signal for ci
+	amp_ref = 150.0  # Amplitude of sine wave signal for ref
 # 	amp_ci = 0.0	 # Amplitude of sine wave signal for ci; No signal
 # 	amp_ref = 0.0  # Amplitude of sine wave signal for ref; No signal
 	mean_ci = 200  # Mean count rate of ci.
