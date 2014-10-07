@@ -106,9 +106,9 @@ if __name__ == "__main__":
 	"""
 	"""
 	dt = 1.0 / 8192.0  # The timestep or amount of time per bin, in seconds.
-	n_bins = 128  # Number of bins in one light curve (assuming both curves are 
+# 	n_bins = 128  # Number of bins in one light curve (assuming both curves are 
 				  # of same length).
-# 	n_bins = 32768
+	n_bins = 32768
 	freq = 401.0  # Frequency of sine wave signals, in Hz. Works well when this 	
 				  # is a power of 2 (otherwise we get aliasing). Assuming that 
 				  # the signals of both light curves have the same frequency.
@@ -121,11 +121,12 @@ if __name__ == "__main__":
 	noisy = True  # Boolean flag: True gives a noisy light curve, False gives a 
 				  # smooth one.
 					
-	parser = argparse.ArgumentParser()
-	parser.add_argument('plot_file', help="Name of output plot file.")
-	args = parser.parse_args()
+# 	parser = argparse.ArgumentParser()
+# 	parser.add_argument('plot_file', help="Name of output plot file.")
+# 	args = parser.parse_args()
 	
-	curve_ci, curve_ref = main(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, 
-		mean_ref, noisy)
+	curve_ci, curve_ref = generate_sines(dt, n_bins, freq, amp_ci, amp_ref, 
+		mean_ci, mean_ref, noisy)
+# 	print curve_ci
 
 ## End of 'generate_sines.py'
