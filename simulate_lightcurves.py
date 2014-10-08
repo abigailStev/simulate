@@ -98,8 +98,30 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, noisy):
 		return noisy_sine_ci, noisy_sine_ref
 	## End 'else noisy'
 		
-## End of function 'main'
+## End of function 'generate_sines'
 
+
+###############################################################################
+def read_fakeit_spectra(spec_file)
+	"""
+			read_fakeit_spectra
+	
+	Reads spectra (created by the heasoft tool 'fakeit') from a text file.
+	
+	Passed: spec_file - Filename of energy spectrum.
+	
+	Returns: spectrum - 
+	
+	"""
+	
+	spectrum = np.loadtxt(spec_file, dtype=float)
+	
+	print len(spectrum)
+	assert len(spectrum) == 64
+	
+	return spectrum
+	
+	
 
 ###############################################################################
 if __name__ == "__main__":
@@ -120,7 +142,9 @@ if __name__ == "__main__":
 # 	amp_ref = 0.0  # Amplitude of sine wave signal for ref; No signal
 	noisy = True  # Boolean flag: True gives a noisy light curve, False gives a 
 				  # smooth one.
-					
+	
+	exposure_time = 2 # ks  100  # ks
+	
 # 	parser = argparse.ArgumentParser()
 # 	parser.add_argument('plot_file', help="Name of output plot file.")
 # 	args = parser.parse_args()
