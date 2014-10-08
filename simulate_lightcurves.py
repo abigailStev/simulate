@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 """
 		simulate_lightcurves
 
-Creates two synthetic light curves by adding Poisson noise to a sine wave signal.
+Creates two synthetic light curves by adding Poisson noise to a sine wave.
 
 Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 
@@ -112,12 +112,12 @@ if __name__ == "__main__":
 	freq = 401.0  # Frequency of sine wave signals, in Hz. Works well when this 	
 				  # is a power of 2 (otherwise we get aliasing). Assuming that 
 				  # the signals of both light curves have the same frequency.
-	amp_ci = 100.0  # Amplitude of sine wave signal for ci
-	amp_ref = 150.0  # Amplitude of sine wave signal for ref
+	mean_ci = 10  # Mean count rate of ci.
+	amp_ci = 1.0  # Amplitude of sine wave signal for ci
+	mean_ref = 200  # Mean count rate of ref.
+	amp_ref = 14.0  # Amplitude of sine wave signal for ref
 # 	amp_ci = 0.0	 # Amplitude of sine wave signal for ci; No signal
 # 	amp_ref = 0.0  # Amplitude of sine wave signal for ref; No signal
-	mean_ci = 200  # Mean count rate of ci.
-	mean_ref = 200  # Mean count rate of ref.
 	noisy = True  # Boolean flag: True gives a noisy light curve, False gives a 
 				  # smooth one.
 					
