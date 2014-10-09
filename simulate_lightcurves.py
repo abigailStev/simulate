@@ -102,7 +102,7 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, noisy):
 
 
 ###############################################################################
-def read_fakeit_spectra(spec_file)
+def read_fakeit_spectra(spec_file):
 	"""
 			read_fakeit_spectra
 	
@@ -114,13 +114,14 @@ def read_fakeit_spectra(spec_file)
 	
 	"""
 	
-	spectrum = np.loadtxt(spec_file, dtype=float)
+	table = np.loadtxt(spec_file, dtype=float)
+	spectrum = table[:,1]
+	err = table[:,2]
 	
-	print len(spectrum)
 	assert len(spectrum) == 64
 	
 	return spectrum
-	
+## End of function 'read_fakeit_spectra'
 	
 
 ###############################################################################
@@ -149,8 +150,12 @@ if __name__ == "__main__":
 # 	parser.add_argument('plot_file', help="Name of output plot file.")
 # 	args = parser.parse_args()
 	
+	spec = read_fakeit_spectra("/Users/abigailstevens/Dropbox/Research/energy_spectra/out_es/P70080_140917_t1_4sec_pbin_35.dat")
+	
 	curve_ci, curve_ref = generate_sines(dt, n_bins, freq, amp_ci, amp_ref, 
 		mean_ci, mean_ref, noisy)
+	
+	
 # 	print curve_ci
 
 ## End of 'generate_sines.py'
