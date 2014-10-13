@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
+from astropy.io import fits
 
 """
 		simulate_lightcurves
@@ -152,12 +153,22 @@ def read_fakeit_spectra(spec_file):
 	
 	"""
 	
-	table = np.loadtxt(spec_file, dtype=float)
-	spectrum = table[:,1]
-	err = table[:,2]
+# 	print spec_file[-3:]
+	
+	if spec_file[-3:] == "dat":
+		table = np.loadtxt(spec_file, dtype=float)
+		spectrum = table[:,1]	
+	
+	elif spec_file[-3:] == "fak":
+		file_hdu = fits.open(spec_file)
+		spectrum = file_hdu[1].data.field(0)
+	else:
+		print "\n\tERROR: Spectrum format not recognized. Exiting."
+		exit()
 	
 	assert len(spectrum) == 64
-	
+# 	print np.shape(spectrum)
+
 	return spectrum
 ## End of function 'read_fakeit_spectra'
 	
@@ -170,7 +181,7 @@ def make_lightcurves(spec_ci, spec_ref, sine_ci, sine_ref):
 	Multiplies a spectrum by a sinusoid to create a fake lightcurve per energy 
 	channel, for ci and reference.
 	
-	Passed: spec_ci -
+	Passed: spec_ci - 
 			spec_ref - 
 			sine_ci - 
 			sine_ref - 
@@ -204,14 +215,14 @@ if __name__ == "__main__":
 	dt = 1.0 / 8192.0  # The timestep or amount of time per bin, in seconds.
 # 	n_bins = 128  # Number of bins in one light curve (assuming both curves are 
 				  # of same length).
-	n_bins = 1024
+	n_bins = 8192
 	freq = 401.0  # Frequency of sine wave signals, in Hz. Works well when this 	
 				  # is a power of 2 (otherwise we get aliasing). Assuming that 
 				  # the signals of both light curves have the same frequency.
-	mean_ci = 8.34  # Mean count rate of ci.
+	mean_ci = 5.5  # Mean count rate of ci.
 	amp_ci = 1.0  # Amplitude of sine wave signal for ci
-	mean_ref = 8.34  # Mean count rate of ref; when summed for the 24 energy 
-	                 # channels used in reference band, should get 200 cts/sec
+	mean_ref = 5.5  # Mean count rate of ref; when summed for the 24 energy 
+	                 # channels used in reference band, should get 130 cts/sec
 	amp_ref = 1.0  # Amplitude of sine wave signal for ref
 	phase_ci = 0.0  # The phase shift of the ci sine wave signal
 # 	amp_ci = 0.0	 # Amplitude of sine wave signal for ci; No signal
@@ -225,7 +236,8 @@ if __name__ == "__main__":
 # 	parser.add_argument('plot_file', help="Name of output plot file.")
 # 	args = parser.parse_args()
 	
-	spectrum_file = "/Users/abigailstevens/Dropbox/Research/energy_spectra/out_es/P70080_140917_t1_4sec_pbin_35.dat"
+# 	spectrum_file = "/Users/abigailstevens/Dropbox/Research/energy_spectra/out_es/P70080_140917_t1_4sec_pbin_35.dat"
+	spectrum_file = "fakeit_mean.fak"
 	
 	spec_ci = read_fakeit_spectra(spectrum_file)
 	spec_ref = read_fakeit_spectra(spectrum_file)
@@ -235,5 +247,8 @@ if __name__ == "__main__":
 	
 	curve_ci, curve_ref = make_lightcurves(spec_ci, spec_ref, sine_ci, sine_ref)
 	
-	plot_curves(n_bins, sine_ci, sine_ref, "plot.png")
+# 	plot_curves(n_bins, sine_ci, sine_ref, "plot.png")
+
+## End of main function
+
 ## End of 'generate_sines.py'
