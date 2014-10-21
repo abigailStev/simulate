@@ -9,8 +9,6 @@ from ccf import stack_reference_band
 """
 		simulate_lightcurves
 
-Creates two synthetic light curves by adding Poisson noise to a sine wave.
-
 Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 
 All scientific modules imported above, as well as Python 2.7, can be downloaded 
@@ -65,7 +63,7 @@ def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 	
 ###############################################################################
 def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
-	phase_ci, phase_spec, noisy):
+	phase_ci, phase_spec):
 	"""
 			generate_sines
 		
@@ -88,10 +86,9 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 			phase_ci - The phase shift of ci with respect to ref, in radians?
 			phase_spec - The phase shift for the power law variability, in 
 				radians?
-			noisy - True for Poisson noise, False for no noise
 	
-	Returns: noisy_sine_ci - Noisified ci of length n_bins
-			 noisy_sine_ref - Noisified ref of length n_bins
+	Returns: sine_ci - Relative sine wave signal for ci of length n_bins.
+			 sine_ref - Relative sine wave signal for ref of length n_bins.
 			 
 	"""
 	
@@ -228,7 +225,7 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, \
 	# Note: 'ValueError: lam < 0' means that 'np.random.poisson' is getting 
 	# negative values as its input.
 	
-# 		print "Mean noisy sine ci =", np.mean(noisy_sine_ci), ", mean noisy sine ref =", np.mean(noisy_sine_ref)
+# 	print "Mean noisy sine ci =", np.mean(noisy_curve_ci), ", mean noisy sine ref =", np.mean(noisy_curve_ref)
 
 	return noisy_curve_ci, noisy_curve_ref
 ## End of function 'add_lightcurves'
@@ -267,14 +264,8 @@ if __name__ == "__main__":
 	parser.add_argument('--exposure', type=float, default=1000.0, \
 		dest='exposure', help='Exposure time of the observation, in seconds. \
 		[1000.0]')
-	parser.add_argument('--noisy', type=int, default=1, choices=range(0, 2), \
-		dest='noisy', help='0 if using a smooth sine wave signal, 1 if adding \
-		Poisson noise to it. [1]')
 	args = parser.parse_args()
 
-	noisy = True
-	if args.noisy == 0:
-		noisy = False
 
 	t_res = 1.0 / 8192.0
 	dt = args.dt_mult * t_res
@@ -290,7 +281,7 @@ if __name__ == "__main__":
 	
 	sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
 		args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
-		args.phase_spec, noisy)
+		args.phase_spec)
 	
 	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref)
 # 	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref)
