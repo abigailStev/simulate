@@ -1,0 +1,14 @@
+		simulate
+	
+Simulating a light curve that has time-domain periodic variability an an energy 
+spectrum composed of a blackbody and power law that vary out of phase.
+
+CONTENTS:
+
+simulate_lightcurves.py -- Does the aforementioned stuff.
+
+run_simulate.sh -- Bash script to run simulate_lightcurves.py.
+
+
+
+THIS CODE COMES WITH NO LEGAL GUARANTEES.
