@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from tools import power_of_two
 from ccf import stack_reference_band
+import powerspec
+from scipy import fftpack
 
 """
 		simulate_lightcurves
@@ -160,7 +162,41 @@ def read_fakeit_spectra(spec_file):
 	return spectrum
 ## End of function 'read_fakeit_spectra'
 	
+
+###############################################################################
+def doing_power_spectra_things(mean_ps_ref, dt, n_bins, mean_rate_ref):
 	
+	print len(mean_ps_ref)
+	print np.shape(mean_ps_ref)
+	print mean_ps_ref[398:403]
+		
+	ps_freq = fftpack.fftfreq(n_bins, d=dt)
+	
+	max_index = np.argmax(ps_freq)
+	ps_freq = ps_freq[0:max_index + 1]  # because it slices at end-1, and we want to 
+								  # include max
+	mean_ps_ref = mean_ps_ref[0:max_index + 1]
+	np.savetxt( "powerspectrum.dat", mean_ps_ref)
+
+	
+	## Leahy normalization
+	leahy_power = 2.0 * mean_ps_ref * dt / float(n_bins) / mean_rate_ref
+	print "Mean value of Leahy power =", np.mean(leahy_power)  # ~2
+	
+	fig, ax = plt.subplots()
+	ax.plot(ps_freq, leahy_power-2, linewidth=2)
+	plt.xlabel(r'$\nu$ [Hz]')
+	plt.ylabel('Noise-subtracted averaged Leahy power')
+	plt.xlim(0,800)
+	plt.ylim(0,)
+	# plt.xscale('symlog') # this works much better than 'log'
+	# plt.yscale('symlog')
+	plt.title("Power spectrum")
+	plt.savefig("powerspectrum.png", dpi=120)
+# 	plt.show()
+	plt.close()
+	
+
 ###############################################################################
 def make_lightcurves(spec_xx, sine_ci, sine_ref):
 	"""
@@ -178,19 +214,19 @@ def make_lightcurves(spec_xx, sine_ci, sine_ref):
 	
 	"""
 	
-	print "Shape of ci spectrum:", np.shape(spec_xx)
-	print "Shape of sine ci:", np.shape(np.reshape(sine_ci, (n_bins,1)))
+# 	print "Shape of ci spectrum:", np.shape(spec_xx)
+# 	print "Shape of sine ci:", np.shape(np.reshape(sine_ci, (n_bins,1)))
 	curve_ci_xx = np.multiply(np.reshape(sine_ci, (n_bins,1)), \
 		spec_xx[np.newaxis])
-	print "Shape of curve_ci:", np.shape(curve_ci_xx)
+# 	print "Shape of curve_ci:", np.shape(curve_ci_xx)
 	
-	print "Shape of ref spectrum:", np.shape(spec_xx)
-	print "Shape of sine ref:", np.shape(sine_ref)
+# 	print "Shape of ref spectrum:", np.shape(spec_xx)
+# 	print "Shape of sine ref:", np.shape(sine_ref)
 	curve_ref_xx = np.multiply(np.reshape(sine_ref, (n_bins,1)), \
 		spec_xx[np.newaxis])
-	print "Shape of curve_ref:", np.shape(curve_ref_xx)
+# 	print "Shape of curve_ref:", np.shape(curve_ref_xx)
 	curve_ref_xx = stack_reference_band(curve_ref_xx, 5)
-	print "Shape of curve_ref after stacking:", np.shape(curve_ref_xx)
+# 	print "Shape of curve_ref after stacking:", np.shape(curve_ref_xx)
 	
 	return curve_ci_xx, curve_ref_xx
 ## End of function 'make_lightcurves'
@@ -220,8 +256,11 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, \
 	curve_ref = curve_ref_bb + curve_ref_pl
 	
 	## Adding Poisson noise to curve_ci and curve_ref, changing to 'count rate'
-	noisy_curve_ci = np.random.poisson(curve_ci * dt) / exposure / dt
-	noisy_curve_ref = np.random.poisson(curve_ref * dt) / exposure / dt
+# 	noisy_curve_ci = np.random.poisson(curve_ci * dt) / exposure / dt
+# 	noisy_curve_ref = np.random.poisson(curve_ref * dt) / exposure / dt
+	noisy_curve_ci = np.random.poisson(curve_ci * dt / exposure) / dt
+	noisy_curve_ref = np.random.poisson(curve_ref * dt / exposure) / dt
+	
 	# Note: 'ValueError: lam < 0' means that 'np.random.poisson' is getting 
 	# negative values as its input.
 	
@@ -278,20 +317,40 @@ if __name__ == "__main__":
 	
 	spec_bb = read_fakeit_spectra(args.bb_spec)
 	spec_pl = read_fakeit_spectra(args.pl_spec)
+	mean_curve_ci = 0
+	mean_curve_ref = 0
+	mean_ps_ref = 0
+	mean_rate_ref = 0
 	
-	sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
-		args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
-		args.phase_spec)
+	for i in xrange(1,10001): # 'i' tracks the number of segments
+		sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
+			args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
+			args.phase_spec)
 	
-	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref)
-# 	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref)
-	curve_ci_pl = curve_ci_bb
-	curve_ref_pl = curve_ref_bb
+		curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref)
+	# 	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref)
+		curve_ci_pl = curve_ci_bb
+		curve_ref_pl = curve_ref_bb
 
-	c_ci, c_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, args.exposure)
+		curve_ci, curve_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, args.exposure)
+		mean_curve_ci += curve_ci
+		mean_curve_ref += curve_ref
+		
+		ps_ref, rate_ref = powerspec.each_segment(curve_ref)
+		mean_ps_ref += ps_ref
+		mean_rate_ref += rate_ref
+		
+		if i % 10 == 0: print "\t", i
+	## End of for-loop
 	
-	plot_curves(n_bins, c_ci[:,6], c_ref, "plot.png")
+	mean_ps_ref /= i
+	mean_rate_ref /= i
+	print mean_rate_ref
+	
+	plot_curves(n_bins, mean_curve_ci[:,6], mean_curve_ref, "plot.png")
 
+	doing_power_spectra_things(mean_ps_ref, dt, n_bins, mean_rate_ref)
+	
 ## End of main function
 
 ## End of 'generate_sines.py'
