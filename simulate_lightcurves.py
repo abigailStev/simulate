@@ -3,6 +3,7 @@ import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 from astropy.io import fits
+from tools import power_of_two
 
 """
 		simulate_lightcurves
@@ -14,18 +15,20 @@ Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
 All scientific modules imported above, as well as Python 2.7, can be downloaded 
 in the Anaconda package, https://store.continuum.io/cshop/anaconda/
 
+'tools' can be found in the github repo 'whizzy_scripts'
+
 """
 ###############################################################################
-def plot_curves(n_bins, curve_1, curve_2, plot_file):
+def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 	"""
 			plot_curves
 	
-	Plots two light curves of length n_bins.
+	Plots two lightcurves of length n_bins.
 	
-	Passed: n_bins - Length of light curves. Must be a power of 2.
-			curve_1 - Amplitudes of light curve 1
-			curve_2 - Amplitudes of light curve 2
-			plot_file - Name of plot file
+	Passed: n_bins - Length of lightcurves. Must be a power of 2.
+			curve_1 - Amplitudes of ci lightcurve.
+			curve_2 - Amplitudes of ref lightcurve.
+			plot_file - Name of plot file.
 			
 	Returns: nothing
 	
@@ -34,9 +37,9 @@ def plot_curves(n_bins, curve_1, curve_2, plot_file):
 	bins = np.arange(0,n_bins) # Bins to plot against
 
 	fig, ax = plt.subplots()
-	ax.plot(bins, curve_1, linewidth=1.5, label="Curve 1")
-	ax.plot(bins, curve_2, linewidth=1.5, label="Curve 2")
-	plt.xlim(0, n_bins)
+	ax.plot(bins, curve_ci, linewidth=1.5, label="Curve 'ci'")
+	ax.plot(bins, curve_ref, linewidth=1.5, label="Curve 'ref'")
+	plt.xlim(0, 30)
 	plt.xlabel('Bins')
 	plt.ylabel('Amplitude')
 
@@ -77,9 +80,8 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 				noise-only process, set amp_ci = 0.
 			amp_ref - Amplitude of the sine wave signal for ref. To simulate a 
 				noise-only process, set amp_ref = 0.
-			mean_ci - Mean of the sine wave signal for ci, in count rate units.
-			mean_ref - Mean of the sine wave signal for ref, in count rate 
-				units.
+			mean_ci - Mean of the sine wave signal for ci.
+			mean_ref - Mean of the sine wave signal for ref.
 			phase_ci - The phase shift for the ci sine wave signal, in radians?
 			noisy - True for Poisson noise, False for no noise
 	
@@ -129,9 +131,14 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 	
 		## Adding Poisson noise to sine_ci and sine_ref
 		## Dividing by dt puts values into 'count rate' units
-		noisy_sine_ci = np.random.poisson(np.asarray(sine_ci) * dt) / dt
-		noisy_sine_ref = np.random.poisson(np.asarray(sine_ref) * dt) / dt
-
+# 		noisy_sine_ci = np.random.poisson(np.asarray(sine_ci) * dt) / dt
+# 		noisy_sine_ref = np.random.poisson(np.asarray(sine_ref) * dt) / dt
+		noisy_sine_ci = np.asarray(sine_ci)
+		noisy_sine_ref = np.asarray(sine_ref)
+		
+		# Note: 'ValueError: lam < 0' means that 'np.random.poisson' is getting 
+		# negative values as its input.
+		
 # 		print "Mean noisy sine ci =", np.mean(noisy_sine_ci), ", mean noisy sine ref =", np.mean(noisy_sine_ref)
 		
 		return noisy_sine_ci, noisy_sine_ref
@@ -174,80 +181,104 @@ def read_fakeit_spectra(spec_file):
 	
 	
 ###############################################################################
-def make_lightcurves(spec_ci, spec_ref, sine_ci, sine_ref):
+def make_lightcurves(spec_xx, sine_ci, sine_ref):
 	"""
 			make_lightcurves
 	
 	Multiplies a spectrum by a sinusoid to create a fake lightcurve per energy 
 	channel, for ci and reference.
 	
-	Passed: spec_ci - 
-			spec_ref - 
+	Passed: spec_xx - 
 			sine_ci - 
 			sine_ref - 
 	
-	Returns: curve_ci - 
-			 curve_ref - 
+	Returns: curve_ci_xx - 
+			 curve_ref_xx - 
 	
 	"""
 	
-	print "Shape of ci spectrum:", np.shape(spec_ci)
+	print "Shape of ci spectrum:", np.shape(spec_xx)
 	print "Shape of sine ci:", np.shape(np.reshape(sine_ci, (n_bins,1)))
-	curve_ci = np.multiply(np.reshape(sine_ci, (n_bins,1)), \
-		spec_ci[np.newaxis])
-	print "Shape of curve_ci:", np.shape(curve_ci)
+	curve_ci_xx = np.multiply(np.reshape(sine_ci, (n_bins,1)), \
+		spec_xx[np.newaxis])
+	print "Shape of curve_ci:", np.shape(curve_ci_xx)
 	
-	print "Shape of ref spectrum:", np.shape(spec_ref)
+	print "Shape of ref spectrum:", np.shape(spec_xx)
 	print "Shape of sine ref:", np.shape(sine_ref)
-	curve_ref = np.multiply(np.reshape(sine_ref, (n_bins,1)), \
-		spec_ref[np.newaxis])
-	print "Shape of curve_ref:", np.shape(curve_ref)
+	curve_ref_xx = np.multiply(np.reshape(sine_ref, (n_bins,1)), \
+		spec_xx[np.newaxis])
+	print "Shape of curve_ref:", np.shape(curve_ref_xx)
 	
-	return curve_ci, curve_ref
+	return curve_ci_xx, curve_ref_xx
 	
 ## End of function 'make_lightcurves'
+
+
+###############################################################################
+def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl):
+	"""
+			add_lightcurves
+	
+	Adds together the lightcurves from the blackbody and the power law, and adds
+	Poisson noise to the lightcurve.
+	
+	Passed:
+	
+	Returns:
+	
+	"""
+	
+	curve_ci = curve_ci_bb + curve_ci_pl
+	curve_ref = curve_ref_bb + curve_ref_pl
+	
+	return curve_ci, curve_ref
+## End of function 'add_lightcurves'
 
 
 ###############################################################################
 if __name__ == "__main__":
 	"""
 	"""
-	dt = 1.0 / 8192.0  # The timestep or amount of time per bin, in seconds.
-# 	n_bins = 128  # Number of bins in one light curve (assuming both curves are 
-				  # of same length).
-	n_bins = 8192
-	freq = 401.0  # Frequency of sine wave signals, in Hz. Works well when this 	
-				  # is a power of 2 (otherwise we get aliasing). Assuming that 
-				  # the signals of both light curves have the same frequency.
-	mean_ci = 5.5  # Mean count rate of ci.
-	amp_ci = 1.0  # Amplitude of sine wave signal for ci
-	mean_ref = 5.5  # Mean count rate of ref; when summed for the 24 energy 
-	                 # channels used in reference band, should get 130 cts/sec
-	amp_ref = 1.0  # Amplitude of sine wave signal for ref
-	phase_ci = 0.0  # The phase shift of the ci sine wave signal
-# 	amp_ci = 0.0	 # Amplitude of sine wave signal for ci; No signal
-# 	amp_ref = 0.0  # Amplitude of sine wave signal for ref; No signal
-	noisy = True  # Boolean flag: True gives a noisy light curve, False gives a 
-				  # smooth one.
 	
-	exposure_time = 2 # ks  100  # ks
+	parser = argparse.ArgumentParser(description='Simulates the lightcurve of a periodic pulsation with the blackbody component varying out of phase with the power law component of the energy spectrum.')
+	parser.add_argument('--freq', type=float, required=True, dest='freq', help='Frequency of the periodic pulsation, in Hz.')
+	parser.add_argument('--bb', required=True, dest='bb_spec', help='Name of .fak spectrum file for blackbody component of the energy spectrum.')
+	parser.add_argument('--pl', required=True, dest='pl_spec', help='Name of .fak spectrum file for the power law component of the energy spectrum.')
+	parser.add_argument('--num_seconds', type=int, default=1, dest='num_seconds', help='Number of seconds in each segment. Must be a power of 2.')
+	parser.add_argument('--dt_mult', type=int, default=1, dest='dt_mult',  help='Multiple of 1/8192 seconds for timestep between bins.')
+	parser.add_argument('--mean_ci', type=float, default=0.0, dest='mean_ci', help='Mean value of the signal for the channels of interest.')
+	parser.add_argument('--mean_ref', type=float, default=0.0, dest='mean_ref', help='Mean value of the signal for the reference band.')
+	parser.add_argument('--amp_ci', type=float, default=1.0, dest='amp_ci', help='Amplitude of the signal for the channels of interest.')
+	parser.add_argument('--amp_ref', type=float, default=1.0, dest='amp_ref', help='Amplitude of the signal for the reference band.')
+	parser.add_argument('--phase_ci', type=float, default=0.0, dest='phase_ci', help='Phase difference from the reference band to the channels of interest, in radians.')
+	parser.add_argument('--exposure', type=float, default=0.0, dest='exposure', help='Exposure time of the observation, in seconds.')
+	parser.add_argument('--noisy', type=int, default=0, choices=range(0, 2), dest='noisy', help='0 if using a smooth sine wave signal, 1 if adding Poisson noise to it.')
+	args = parser.parse_args()
+
+	noisy = True
+	if args.noisy == 0:
+		noisy = False
+
+	t_res = 1.0 / 8192.0
+	dt = args.dt_mult * t_res
+	n_bins = args.num_seconds * int(1.0 / dt)
+	print "n_bins = ", n_bins
+	## Idiot checks, to ensure that our assumptions hold
+	assert n_bins > 0  # number of bins must be a positive integer
+	assert dt > 0
+	assert power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
 	
-# 	parser = argparse.ArgumentParser()
-# 	parser.add_argument('plot_file', help="Name of output plot file.")
-# 	args = parser.parse_args()
+	spec_bb = read_fakeit_spectra(args.bb_spec)
+	spec_pl = read_fakeit_spectra(args.pl_spec)
 	
-# 	spectrum_file = "/Users/abigailstevens/Dropbox/Research/energy_spectra/out_es/P70080_140917_t1_4sec_pbin_35.dat"
-	spectrum_file = "fakeit_mean.fak"
+	sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, noisy)
 	
-	spec_ci = read_fakeit_spectra(spectrum_file)
-	spec_ref = read_fakeit_spectra(spectrum_file)
+	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref)
+	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref)
+
+	c_ci, c_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl)
 	
-	sine_ci, sine_ref = generate_sines(dt, n_bins, freq, amp_ci, amp_ref, 
-		mean_ci, mean_ref, phase_ci, noisy)
-	
-	curve_ci, curve_ref = make_lightcurves(spec_ci, spec_ref, sine_ci, sine_ref)
-	
-# 	plot_curves(n_bins, sine_ci, sine_ref, "plot.png")
+	plot_curves(n_bins, sine_ci, sine_ref, "plot.png")
 
 ## End of main function
 
