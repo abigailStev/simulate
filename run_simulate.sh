@@ -12,6 +12,7 @@ amp_ci=0.09
 amp_ref=0.09
 exposure=1.0
 phase_spec=-1.0
+num_sec=1
 
 if [ ${bb_spec: -4} == ".fak" ] && [ ${pl_spec: -4} == ".fak" ]; then
 	bb_exposure=$(python -c "from tools import get_key_val; print get_key_val('$bb_spec', 1, 'EXPOSURE')")
@@ -23,8 +24,12 @@ fi
 
 # python "$exe_dir"/simulate_lightcurves.py -h
 
-python "$exe_dir"/simulate_lightcurves.py --freq "$freq" --bb "$bb_spec" --pl "$pl_spec" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --exposure "$exposure" --phase_spec "$phase_spec"
+python "$exe_dir"/simulate_lightcurves.py --freq "$freq" --bb "$bb_spec" --pl "$pl_spec" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$num_sec" --exposure "$exposure" --phase_spec "$phase_spec"
 
 if [ -e "$exe_dir/plot.png" ]; then
 	open -a ImageJ "$exe_dir/plot.png"
+fi
+
+if [ -e "$exe_dir/powerspectrum.png" ]; then
+	open -a ImageJ "$exe_dir/powerspectrum.png"
 fi
