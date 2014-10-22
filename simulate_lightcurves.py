@@ -3,7 +3,7 @@ import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 from astropy.io import fits
-from tools import power_of_two
+import tools
 from ccf import stack_reference_band
 import powerspec
 from scipy import fftpack
@@ -183,10 +183,16 @@ def doing_power_spectra_things(mean_ps_ref, dt, n_bins, mean_rate_ref):
 	leahy_power = 2.0 * mean_ps_ref * dt / float(n_bins) / mean_rate_ref
 	print "Mean value of Leahy power =", np.mean(leahy_power)  # ~2
 	
+	rms2_power = 2.0 * mean_ps_ref * dt / float(n_bins) / \
+		(mean_rate_ref ** 2)
+	rms2_power -= 2.0 / mean_rate_ref
+	
 	fig, ax = plt.subplots()
-	ax.plot(ps_freq, leahy_power-2, linewidth=2)
+	ax.plot(ps_freq, rms2_power, linewidth=2)
+# 	ax.plot(ps_freq, leahy_power-2, linewidth=2)
+
 	plt.xlabel(r'$\nu$ [Hz]')
-	plt.ylabel('Noise-subtracted averaged Leahy power')
+	plt.ylabel('Noise-subtracted averaged power')
 	plt.xlim(0,800)
 	plt.ylim(0,)
 	# plt.xscale('symlog') # this works much better than 'log'
@@ -256,11 +262,8 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, \
 	curve_ref = curve_ref_bb + curve_ref_pl
 	
 	## Adding Poisson noise to curve_ci and curve_ref, changing to 'count rate'
-# 	noisy_curve_ci = np.random.poisson(curve_ci * dt) / exposure / dt
-# 	noisy_curve_ref = np.random.poisson(curve_ref * dt) / exposure / dt
 	noisy_curve_ci = np.random.poisson(curve_ci * dt / exposure) / dt
 	noisy_curve_ref = np.random.poisson(curve_ref * dt / exposure) / dt
-	
 	# Note: 'ValueError: lam < 0' means that 'np.random.poisson' is getting 
 	# negative values as its input.
 	
@@ -273,47 +276,51 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, \
 ###############################################################################
 if __name__ == "__main__":
 	
-	parser = argparse.ArgumentParser(description='Simulates the light curve of a periodic pulsation with the blackbody component varying out of phase with the power law component of the energy spectrum.')
+	parser = argparse.ArgumentParser(description='Simulates the light curve of \
+		a periodic pulsation with the blackbody component varying out of phase \
+		with the power law component of the energy spectrum.', epilog='For optional arguments, default values are given in brackets at end of description.')
 	parser.add_argument('--freq', type=float, required=True, dest='freq', \
 		help='Frequency of the periodic pulsation, in Hz.')
 	parser.add_argument('--bb', required=True, dest='bb_spec', help='Name of \
 		.fak spectrum file for blackbody component of the energy spectrum.')
 	parser.add_argument('--pl', required=True, dest='pl_spec', help='Name of \
 		.fak spectrum file for the power law component of the energy spectrum.')
-	parser.add_argument('--num_seconds', type=int, default=1, \
-		dest='num_seconds', help='Number of seconds in each segment. Must be a \
-		power of 2. [1]')
-	parser.add_argument('--dt_mult', type=int, default=1, dest='dt_mult', \
-		help='Multiple of 1/8192 seconds for timestep between bins. [1]')
-	parser.add_argument('--mean_ci', type=float, default=1.0, dest='mean_ci', \
+	parser.add_argument('--num_seconds', type=tools.type_power_of_two, \
+		default=1, dest='num_seconds', help='Number of seconds in each segment.\
+		Must be a power of 2. [1]')
+	parser.add_argument('--dt_mult', type=tools.type_power_of_two, default=1, \
+		dest='dt_mult', help='Multiple of 1/8192 seconds for timestep between \
+		bins. Must be a power of 2. [1]')
+	parser.add_argument('--mean_ci', type=tools.type_positive_float, default=1.0, dest='mean_ci', \
 		help='Mean value of the signal for the channels of interest. [1.0]')
-	parser.add_argument('--mean_ref', type=float, default=1.0, dest='mean_ref',\
+	parser.add_argument('--mean_ref', type=tools.type_positive_float, default=1.0, dest='mean_ref',\
 		help='Mean value of the signal for the reference band. [1.0]')
-	parser.add_argument('--amp_ci', type=float, default=0.5, dest='amp_ci', \
+	parser.add_argument('--amp_ci', type=tools.type_positive_float, default=0.5, dest='amp_ci', \
 		help='Fractional amplitude of the signal for the channels of interest. \
 		[0.5]')
-	parser.add_argument('--amp_ref', type=float, default=0.5, dest='amp_ref', \
+	parser.add_argument('--amp_ref', type=tools.type_positive_float, default=0.5, dest='amp_ref', \
 		help='Fractional amplitude of the signal for the reference band. [0.5]')
-	parser.add_argument('--phase_ci', type=float, default=0.0, dest='phase_ci',\
+	parser.add_argument('--phase_ci', type=tools.type_positive_float, default=0.0, dest='phase_ci',\
 		help='Phase difference of the channels of interest with respect to the \
 		reference band. [0.0]')
-	parser.add_argument('--phase_spec', type=float, default=0.0, \
+	parser.add_argument('--phase_spec', type=tools.type_positive_float, default=0.0, \
 		dest='phase_spec', help='Phase difference of the power law variability \
 		to the blackbody variability in the energy spectrum. [0.0]')
-	parser.add_argument('--exposure', type=float, default=1000.0, \
+	parser.add_argument('--exposure', type=tools.type_positive_float, default=1000.0, \
 		dest='exposure', help='Exposure time of the observation, in seconds. \
 		[1000.0]')
+	parser.add_argument('--test', type=int, choices={0,1}, default=0, \
+		dest='test', help='0 for full run, 1 for test run. [0]')
 	args = parser.parse_args()
 
-
+	test = False
+	if args.test == 1:
+		test = True
+	
 	t_res = 1.0 / 8192.0
 	dt = args.dt_mult * t_res
 	n_bins = args.num_seconds * int(1.0 / dt)
-
-	## Idiot checks, to ensure that our assumptions hold
-	assert n_bins > 0  # number of bins must be a positive integer
-	assert dt > 0
-	assert power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
+	assert tools.power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
 	
 	spec_bb = read_fakeit_spectra(args.bb_spec)
 	spec_pl = read_fakeit_spectra(args.pl_spec)
@@ -322,7 +329,7 @@ if __name__ == "__main__":
 	mean_ps_ref = 0
 	mean_rate_ref = 0
 	
-	for i in xrange(1,10001): # 'i' tracks the number of segments
+	for i in xrange(1, 1001): # 'i' tracks the number of segments
 		sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
 			args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
 			args.phase_spec)
@@ -331,21 +338,22 @@ if __name__ == "__main__":
 	# 	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref)
 		curve_ci_pl = curve_ci_bb
 		curve_ref_pl = curve_ref_bb
-
 		curve_ci, curve_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, args.exposure)
 		mean_curve_ci += curve_ci
 		mean_curve_ref += curve_ref
-		
-		ps_ref, rate_ref = powerspec.each_segment(curve_ref)
+		ps_ref, rate_ref = powerspec.make_ps(curve_ref)
 		mean_ps_ref += ps_ref
 		mean_rate_ref += rate_ref
+		
+		if i == 1 and test == True: 
+			break
 		
 		if i % 10 == 0: print "\t", i
 	## End of for-loop
 	
 	mean_ps_ref /= i
 	mean_rate_ref /= i
-	print mean_rate_ref
+	print "Mean count rate in reference band:", mean_rate_ref
 	
 	plot_curves(n_bins, mean_curve_ci[:,6], mean_curve_ref, "plot.png")
 
