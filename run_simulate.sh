@@ -6,13 +6,15 @@ exe_dir="$home_dir/Dropbox/Research/simulate"
 out_dir="$exe_dir/out_sim"
 
 freq=401.0
-bb_spec="spectra/fakeit_mean.fak"
-pl_spec="spectra/fakeit_mean.fak"
-amp_ci=0.09
-amp_ref=0.09
-exposure=1.0
-phase_spec=-1.0
-num_sec=1
+# bb_spec="spectra/100000s_mean.fak"
+# pl_spec="spectra/100000s_mean.fak"
+bb_spec="spectra/2400s_mean_nopoiss.fak"
+pl_spec="spectra/2400s_mean_nopoiss.fak"
+amp_ci=0.068
+amp_ref=0.068
+exposure=2400.0
+phase_spec=0.0
+num_sec=4
 
 if [ ${bb_spec: -4} == ".fak" ] && [ ${pl_spec: -4} == ".fak" ]; then
 	bb_exposure=$(python -c "from tools import get_key_val; print get_key_val('$bb_spec', 1, 'EXPOSURE')")
