@@ -164,33 +164,22 @@ def read_fakeit_spectra(spec_file):
 	
 
 ###############################################################################
-def doing_power_spectra_things(mean_ps_ref, dt, n_bins, mean_rate_ref):
+def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
+	mean_rate_ref):
+	"""
+			power_spectra_things
 	
-	print len(mean_ps_ref)
-	print np.shape(mean_ps_ref)
-	print mean_ps_ref[398:403]
-		
-	ps_freq = fftpack.fftfreq(n_bins, d=dt)
+	Computes power spectrum things and plots the power spectrum.
 	
-	max_index = np.argmax(ps_freq)
-	ps_freq = ps_freq[0:max_index + 1]  # because it slices at end-1, and we want to 
-								  # include max
-	mean_ps_ref = mean_ps_ref[0:max_index + 1]
-	np.savetxt( "powerspectrum.dat", mean_ps_ref)
-
+	"""
+	ps_freq, mean_ps_ref, leahy_power, rms2_power, rms2_err_power = \
+		powerspec.normalize(mean_ps_ref, n_bins, dt, num_seconds, num_segments,\
+		mean_rate_ref)
 	
-	## Leahy normalization
-	leahy_power = 2.0 * mean_ps_ref * dt / float(n_bins) / mean_rate_ref
-	print "Mean value of Leahy power =", np.mean(leahy_power)  # ~2
-	
-	rms2_power = 2.0 * mean_ps_ref * dt / float(n_bins) / \
-		(mean_rate_ref ** 2)
-	rms2_power -= 2.0 / mean_rate_ref
-	
+	np.savetxt( "sim_power.dat", mean_ps_ref)
 	fig, ax = plt.subplots()
 	ax.plot(ps_freq, rms2_power, linewidth=2)
 # 	ax.plot(ps_freq, leahy_power-2, linewidth=2)
-
 	plt.xlabel(r'$\nu$ [Hz]')
 	plt.ylabel('Noise-subtracted averaged power')
 	plt.xlim(0,800)
@@ -198,10 +187,11 @@ def doing_power_spectra_things(mean_ps_ref, dt, n_bins, mean_rate_ref):
 	# plt.xscale('symlog') # this works much better than 'log'
 	# plt.yscale('symlog')
 	plt.title("Power spectrum")
-	plt.savefig("powerspectrum.png", dpi=120)
+	plt.savefig("sim_power.png", dpi=120)
 # 	plt.show()
 	plt.close()
-	
+## End of function 'power_spectra_things'
+
 
 ###############################################################################
 def make_lightcurves(spec_xx, sine_ci, sine_ref):
@@ -278,7 +268,9 @@ if __name__ == "__main__":
 	
 	parser = argparse.ArgumentParser(description='Simulates the light curve of \
 		a periodic pulsation with the blackbody component varying out of phase \
-		with the power law component of the energy spectrum.', epilog='For optional arguments, default values are given in brackets at end of description.')
+		with the power law component of the energy spectrum.', epilog='For \
+		optional arguments, default values are given in brackets at end of \
+		description.')
 	parser.add_argument('--freq', type=float, required=True, dest='freq', \
 		help='Frequency of the periodic pulsation, in Hz.')
 	parser.add_argument('--bb', required=True, dest='bb_spec', help='Name of \
@@ -291,33 +283,34 @@ if __name__ == "__main__":
 	parser.add_argument('--dt_mult', type=tools.type_power_of_two, default=1, \
 		dest='dt_mult', help='Multiple of 1/8192 seconds for timestep between \
 		bins. Must be a power of 2. [1]')
-	parser.add_argument('--mean_ci', type=tools.type_positive_float, default=1.0, dest='mean_ci', \
+	parser.add_argument('--mean_ci', type=tools.type_positive_float, \
+		default=1.0, dest='mean_ci', \
 		help='Mean value of the signal for the channels of interest. [1.0]')
-	parser.add_argument('--mean_ref', type=tools.type_positive_float, default=1.0, dest='mean_ref',\
-		help='Mean value of the signal for the reference band. [1.0]')
-	parser.add_argument('--amp_ci', type=tools.type_positive_float, default=0.5, dest='amp_ci', \
-		help='Fractional amplitude of the signal for the channels of interest. \
-		[0.5]')
-	parser.add_argument('--amp_ref', type=tools.type_positive_float, default=0.5, dest='amp_ref', \
-		help='Fractional amplitude of the signal for the reference band. [0.5]')
-	parser.add_argument('--phase_ci', type=tools.type_positive_float, default=0.0, dest='phase_ci',\
-		help='Phase difference of the channels of interest with respect to the \
-		reference band. [0.0]')
-	parser.add_argument('--phase_spec', type=tools.type_positive_float, default=0.0, \
+	parser.add_argument('--mean_ref', type=tools.type_positive_float, \
+		default=1.0, dest='mean_ref', help='Mean value of the signal for the \
+		reference band. [1.0]')
+	parser.add_argument('--amp_ci', type=tools.type_positive_float, \
+		default=0.5, dest='amp_ci', help='Fractional amplitude of the signal \
+		for the channels of interest. [0.5]')
+	parser.add_argument('--amp_ref', type=tools.type_positive_float, \
+		default=0.5, dest='amp_ref', help='Fractional amplitude of the signal \
+		for the reference band. [0.5]')
+	parser.add_argument('--phase_ci', type=tools.type_positive_float, \
+		default=0.0, dest='phase_ci', help='Phase difference of the channels \
+		of interest with respect to the reference band. [0.0]')
+	parser.add_argument('--phase_spec', type=float, default=0.0, \
 		dest='phase_spec', help='Phase difference of the power law variability \
 		to the blackbody variability in the energy spectrum. [0.0]')
-	parser.add_argument('--exposure', type=tools.type_positive_float, default=1000.0, \
-		dest='exposure', help='Exposure time of the observation, in seconds. \
-		[1000.0]')
-	parser.add_argument('--test', type=int, choices={0,1}, default=0, \
-		dest='test', help='0 for full run, 1 for test run. [0]')
+	parser.add_argument('--exposure', type=tools.type_positive_float, \
+		default=1000.0, dest='exposure', help='Exposure time of the \
+		observation, in seconds. [1000.0]')
+	parser.add_argument('--test', action='store_true', dest='test', help='If \
+		present, only does a short test run.')
 	args = parser.parse_args()
 
-	test = False
-	if args.test == 1:
-		test = True
+
 	
-	t_res = 1.0 / 8192.0
+	t_res = 1.0 / 8192.0  # The time resolution of the data, in seconds.
 	dt = args.dt_mult * t_res
 	n_bins = args.num_seconds * int(1.0 / dt)
 	assert tools.power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
@@ -345,7 +338,7 @@ if __name__ == "__main__":
 		mean_ps_ref += ps_ref
 		mean_rate_ref += rate_ref
 		
-		if i == 1 and test == True: 
+		if i == 1 and args.test == True: 
 			break
 		
 		if i % 10 == 0: print "\t", i
@@ -357,7 +350,8 @@ if __name__ == "__main__":
 	
 	plot_curves(n_bins, mean_curve_ci[:,6], mean_curve_ref, "plot.png")
 
-	doing_power_spectra_things(mean_ps_ref, dt, n_bins, mean_rate_ref)
+	power_spectra_things(mean_ps_ref, dt, n_bins, args.num_seconds, i, \
+		mean_rate_ref)
 	
 ## End of main function
 
