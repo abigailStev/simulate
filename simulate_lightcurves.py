@@ -322,7 +322,7 @@ if __name__ == "__main__":
 	mean_ps_ref = 0
 	mean_rate_ref = 0
 	
-	for i in xrange(1, 1001): # 'i' tracks the number of segments
+	for i in xrange(1, 601): # 'i' tracks the number of segments
 		sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
 			args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
 			args.phase_spec)
