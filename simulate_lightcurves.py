@@ -181,7 +181,7 @@ def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
 	ax.plot(ps_freq, rms2_power, linewidth=2)
 # 	ax.plot(ps_freq, leahy_power-2, linewidth=2)
 	plt.xlabel(r'$\nu$ [Hz]')
-	plt.ylabel('Noise-subtracted averaged power')
+	plt.ylabel(r'Noise-subtracted fractional rms$^2$ power')
 	plt.xlim(0,800)
 	plt.ylim(0,)
 	# plt.xscale('symlog') # this works much better than 'log'
@@ -194,7 +194,7 @@ def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
 
 
 ###############################################################################
-def make_lightcurves(spec_xx, sine_ci, sine_ref):
+def make_lightcurves(spec_xx, sine_ci, sine_ref, n_bins):
 	"""
 			make_lightcurves
 	
@@ -204,6 +204,7 @@ def make_lightcurves(spec_xx, sine_ci, sine_ref):
 	Passed: spec_xx - 
 			sine_ci - 
 			sine_ref - 
+			n_bins - 
 	
 	Returns: curve_ci_xx - 
 			 curve_ref_xx - 
@@ -229,7 +230,7 @@ def make_lightcurves(spec_xx, sine_ci, sine_ref):
 
 
 ###############################################################################
-def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, \
+def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 	exposure):
 	"""
 			add_lightcurves
@@ -241,6 +242,7 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, \
 			curve_ref_bb - 
 			curve_ci_pl - 
 			curve_ref_pl - 
+			dt - 
 			exposure - 
 	
 	Returns: noisy_curve_ci - 
@@ -274,7 +276,7 @@ if __name__ == "__main__":
 	parser.add_argument('--freq', type=float, required=True, dest='freq', \
 		help='Frequency of the periodic pulsation, in Hz.')
 	parser.add_argument('--bb', required=True, dest='bb_spec', help='Name of \
-		.fak spectrum file for blackbody component of the energy spectrum.')
+		.fak spectrum file for the blackbody component of the energy spectrum.')
 	parser.add_argument('--pl', required=True, dest='pl_spec', help='Name of \
 		.fak spectrum file for the power law component of the energy spectrum.')
 	parser.add_argument('--num_seconds', type=tools.type_power_of_two, \
@@ -322,16 +324,19 @@ if __name__ == "__main__":
 	mean_ps_ref = 0
 	mean_rate_ref = 0
 	
+	sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
+		args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
+		args.phase_spec)
+	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref, n_bins)
+	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref, n_bins)
+		
 	for i in xrange(1, 601): # 'i' tracks the number of segments
-		sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
-			args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
-			args.phase_spec)
-	
-		curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref)
-	# 	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref)
-		curve_ci_pl = curve_ci_bb
-		curve_ref_pl = curve_ref_bb
-		curve_ci, curve_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, args.exposure)
+		
+		
+# 		curve_ci_pl = curve_ci_bb
+# 		curve_ref_pl = curve_ref_bb
+		curve_ci, curve_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, \
+			curve_ci_pl, curve_ref_pl, dt, args.exposure)
 		mean_curve_ci += curve_ci
 		mean_curve_ref += curve_ref
 		ps_ref, rate_ref = powerspec.make_ps(curve_ref)

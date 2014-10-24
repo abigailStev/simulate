@@ -8,10 +8,10 @@ out_dir="$exe_dir/out_sim"
 freq=401.0
 # bb_spec="spectra/100000s_mean.fak"
 # pl_spec="spectra/100000s_mean.fak"
-bb_spec="spectra/2400s_mean_nopoiss.fak"
-pl_spec="spectra/2400s_mean_nopoiss.fak"
-amp_ci=0.068
-amp_ref=0.068
+bb_spec="spectra/100000s_bb_nopoiss.fak"
+pl_spec="spectra/100000s_pl_nopoiss.fak"
+amp_ci=0.065
+amp_ref=0.065
 exposure=2400.0
 phase_spec=0.0
 num_sec=4
@@ -23,6 +23,8 @@ if [ ${bb_spec: -4} == ".fak" ] && [ ${pl_spec: -4} == ".fak" ]; then
 		exposure=$bb_exposure
 	fi
 fi
+
+echo "$exposure"
 
 # python "$exe_dir"/simulate_lightcurves.py -h
 
