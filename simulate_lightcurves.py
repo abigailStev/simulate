@@ -210,20 +210,17 @@ def make_lightcurves(spec_xx, sine_ci, sine_ref, n_bins):
 			 curve_ref_xx - 
 	
 	"""
-	
-# 	print "Shape of ci spectrum:", np.shape(spec_xx)
-# 	print "Shape of sine ci:", np.shape(np.reshape(sine_ci, (n_bins,1)))
 	curve_ci_xx = np.multiply(np.reshape(sine_ci, (n_bins,1)), \
 		spec_xx[np.newaxis])
-# 	print "Shape of curve_ci:", np.shape(curve_ci_xx)
-	
-# 	print "Shape of ref spectrum:", np.shape(spec_xx)
-# 	print "Shape of sine ref:", np.shape(sine_ref)
 	curve_ref_xx = np.multiply(np.reshape(sine_ref, (n_bins,1)), \
 		spec_xx[np.newaxis])
-# 	print "Shape of curve_ref:", np.shape(curve_ref_xx)
 	curve_ref_xx = stack_reference_band(curve_ref_xx, 5)
-# 	print "Shape of curve_ref after stacking:", np.shape(curve_ref_xx)
+
+	## Multiplying by a normalization factor so that we get ~200 counts/sec in 
+	## the reference band
+	
+	curve_ci_xx *= 25.0
+	curve_ref_xx *= 25.0
 	
 	return curve_ci_xx, curve_ref_xx
 ## End of function 'make_lightcurves'
