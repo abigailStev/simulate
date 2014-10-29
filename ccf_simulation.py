@@ -65,7 +65,8 @@ if __name__ == "__main__":
 	############################
 	## Looping through segments
 	############################
-	for num_segments in xrange(1, 601): # 'i' tracks the number of segments
+	for num_segments in xrange(1, 41948): # 'i' tracks the number of segments
+	
 		curve_ci, curve_ref = sim_lc.add_lightcurves(curve_ci_bb, curve_ref_bb,\
 			curve_ci_pl, curve_ref_pl, dt, exposure)
 		mean_curve_ci += curve_ci
@@ -110,14 +111,20 @@ if __name__ == "__main__":
 	cs_avg = cs_sum / float(num_segments)
 	
 	print "Mean count rate in reference band:", np.mean(mean_curve_ref)
-
 	ccf_filtered, ccf_error = crosscorr.cs_to_ccf_w_err(cs_avg, dt, n_bins, \
 		num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref, \
 		mean_power_ci, mean_power_ref)
+
+	
+	inds_a = np.where(np.isnan(ccf_filtered))
+	ccf_filtered[inds_a] = 0.0
+	inds_b = np.where(np.isnan(ccf_error))
+	ccf_error[inds_b] = 0.0
 		
+	
 	t = np.arange(0, n_bins)
 	in_file = "Faked: " + bb_spec + " + " + pl_spec
-	out_file = "ccf_out.dat"
+	out_file = "out_sim/ccf_out.dat"
 	crosscorr.output(out_file, in_file, dt, n_bins, num_seconds, num_segments,
         mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
 	
@@ -127,7 +134,7 @@ if __name__ == "__main__":
 		num_segments, mean_rate_ref)
 	
 	
-	plot_root = "./ccf"
+	plot_root = "./out_sim/ccf"
 	propID = "FAKE"
 	plot_ccf.main(out_file, plot_root, propID)
 	
