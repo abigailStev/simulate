@@ -219,8 +219,8 @@ def make_lightcurves(spec_xx, sine_ci, sine_ref, n_bins):
 	## Multiplying by a normalization factor so that we get ~200 counts/sec in 
 	## the reference band
 	
-	curve_ci_xx *= 25.0
-	curve_ref_xx *= 25.0
+	curve_ci_xx *= 15.0
+	curve_ref_xx *= 15.0
 	
 	return curve_ci_xx, curve_ref_xx
 ## End of function 'make_lightcurves'
