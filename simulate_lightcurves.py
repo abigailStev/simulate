@@ -65,7 +65,7 @@ def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 	
 ###############################################################################
 def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
-	phase_ci, phase_spec):
+	phase_spec):
 	"""
 			generate_sines
 		
@@ -85,7 +85,6 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 				noise-only process, set amp_ref = 0.
 			mean_ci - Mean of the sine wave signal for ci.
 			mean_ref - Mean of the sine wave signal for ref.
-			phase_ci - The phase shift of ci with respect to ref, in radians?
 			phase_spec - The phase shift for the power law variability, in 
 				radians?
 	
@@ -110,7 +109,7 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 	## Making two sine waves that are sampled over tiny_bins, so they're very 
 	## smooth.
 	tiny_bins = np.arange(0, n_bins, 0.1)
-	smooth_sine_ci = [ (amp_ci * np.sin(2.0 * np.pi * x / bins_per_period + phase_ci + phase_spec) + mean_ci) for x in tiny_bins] # in units 'rate'
+	smooth_sine_ci = [ (amp_ci * np.sin(2.0 * np.pi * x / bins_per_period + phase_spec) + mean_ci) for x in tiny_bins] # in units 'rate'
 	smooth_sine_ref = [ (amp_ref * np.sin(2.0 * np.pi * x / bins_per_period + phase_spec) + mean_ref) for x in tiny_bins] # in units 'rate'
 
 	## Taking the average amplitude of every 10 bins of smooth_sine as the 
@@ -240,7 +239,7 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 			curve_ci_pl - 
 			curve_ref_pl - 
 			dt - 
-			exposure - 
+			exposure -
 	
 	Returns: noisy_curve_ci - 
 			 noisy_curve_ref - 
@@ -294,9 +293,6 @@ if __name__ == "__main__":
 	parser.add_argument('--amp_ref', type=tools.type_positive_float, \
 		default=0.5, dest='amp_ref', help='Fractional amplitude of the signal \
 		for the reference band. [0.5]')
-	parser.add_argument('--phase_ci', type=tools.type_positive_float, \
-		default=0.0, dest='phase_ci', help='Phase difference of the channels \
-		of interest with respect to the reference band. [0.0]')
 	parser.add_argument('--phase_spec', type=float, default=0.0, \
 		dest='phase_spec', help='Phase difference of the power law variability \
 		to the blackbody variability in the energy spectrum. [0.0]')
@@ -322,8 +318,7 @@ if __name__ == "__main__":
 	mean_rate_ref = 0
 	
 	sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
-		args.amp_ref, args.mean_ci, args.mean_ref, args.phase_ci, \
-		args.phase_spec)
+		args.amp_ref, args.mean_ci, args.mean_ref, args.phase_spec)
 	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref, n_bins)
 	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref, n_bins)
 		
