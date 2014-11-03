@@ -11,11 +11,11 @@ freq=401.0
 # pl_spec="spectra/100000s_mean.fak"
 bb_spec="$exe_dir/spectra/100000s_bb_nopoiss.fak"
 pl_spec="$exe_dir/spectra/100000s_pl_nopoiss.fak"
-amp_ci=0.04
-amp_ref=0.04
+amp_ci=0.055
+amp_ref=0.055
 exposure=100000.0
-phase_spec=0.0
 numsec=4
+obs_time=0  # this is set down below
 
 # python "$exe_dir"/simulate_lightcurves.py -h
 
@@ -29,84 +29,87 @@ numsec=4
 # 	open -a ImageJ "$exe_dir/sim_power.png"
 # fi
 
-ccf_file="$out_dir/${day}_ccf.dat"
-plot_root="$out_dir/${day}_ccf"
+phase_spec=1.5708
+# phase_spec=3.1416
+ccf_file="$out_dir/${day}_pi2_ccf.dat"
+plot_root="$out_dir/${day}_pi2_ccf"
+ccfs_plot="$out_dir/${day}_pi2_ccfs.png"
 
 
-
-time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase_spec "$phase_spec" #--test
+time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase_spec "$phase_spec" --test
 
 if [ -e "$ccf_file" ]; then
 	python "$ccf_dir/"plot_ccf.py "$ccf_file" -o "$plot_root" -p "FAKE"
 	open -a ImageJ "${plot_root}_chan_06.png"
+	python "$ccf_dir"/plot_multi.py "$ccf_file" "$ccfs_plot" "${numsec}"
+	open -a ImageJ "$ccfs_plot"
 fi
 
-# ensp_rsp_matrix="$home_dir/Dropbox/Research/energy_spectra/out_es/P70080_141029_70080-01-01-02_PCU2.rsp"
-# rsp_matrix="$out_dir/P70080_141029_70080-01-01-02_PCU2.rsp"
-# cp "$ensp_rsp_matrix" "$rsp_matrix"
-# propID="P70080"
-# day=$(date +%y%m%d)
-# dt=1
-# spec_type=2  # 0 for mean+ccf, 1 for ccf, 2 for mean
-# tab_ext="dat"
-# ensp_exe_dir="$home_dir/Dropbox/Research/energy_spectra"
-# ensp_out_dir="out_es"
-# dump_file="dum.dat"
-# 
-# 
-# if [ -e "$ccf_file" ]; then
-# 	obs_time=$(python -c "from tools import read_obs_time; print read_obs_time('$ccf_file')")
-# 	echo "PIPELINE EXPOSURE TIME =" $obs_time "s"
-# # 	echo `echo "$obs_time / 16.0" | bc -l`
-# else
-# 	obs_time = 0
-# 	echo -e "\n\t Couldn't get observation time from header, set obs_time to zero.\n"
-# fi
-# 
-# 
-# 
-# ## Generating energy spectra at each phase bin
-# # for tbin in {25..40..5}; do  ## should work in bash 4.*, but i have 3.2.*
-# for (( tbin=25; tbin<=40; tbin+=5 )); do
-# # # 	echo "$tbin"
-# 	out_end="${day}_t${dt}_${numsec}sec_pbin_${tbin}"
-# 	out_end_mean="${day}_t${dt}_${numsec}sec_mean"
-# 	out_file="$out_dir/$out_end"
+
+ensp_rsp_matrix="$home_dir/Dropbox/Research/energy_spectra/out_es/P70080_141029_70080-01-01-02_PCU2.rsp"
+rsp_matrix="$out_dir/P70080_141029_70080-01-01-02_PCU2.rsp"
+cp "$ensp_rsp_matrix" "$rsp_matrix"
+propID="P70080"
+day=$(date +%y%m%d)
+dt=1
+spec_type=1  # 0 for mean+ccf, 1 for ccf, 2 for mean
+tab_ext="dat"
+ensp_exe_dir="$home_dir/Dropbox/Research/energy_spectra"
+ensp_out_dir="out_es"
+dump_file="dum.dat"
+
+
+if [ -e "$ccf_file" ]; then
+	obs_time=$(python -c "from tools import read_obs_time; print read_obs_time('$ccf_file')")
+	echo "PIPELINE EXPOSURE TIME =" $obs_time "s"
+# 	echo `echo "$obs_time / 16.0" | bc -l`
+else
+	obs_time = 0
+	echo -e "\n\t Couldn't get observation time from header, set obs_time to zero.\n"
+fi
+
+## Generating energy spectra at each phase bin
+# for tbin in {25..40..5}; do  ## should work in bash 4.*, but i have 3.2.*
+for (( tbin=25; tbin<=45; tbin+=5 )); do
+# # 	echo "$tbin"
+	out_end="${day}_t${dt}_${numsec}sec_pbin_${tbin}"
+	out_end_mean="${day}_t${dt}_${numsec}sec_mean"
+	out_file="$out_dir/$out_end"
 # 	echo "$out_end"
 # 	echo "$out_end_mean"
 # 	echo "$out_file"
-# 	
-# 	if [ -e "${ccf_file}" ]; then
-# 		python "$ensp_exe_dir"/energyspec.py -i "${ccf_file}" -o "${out_file}.${tab_ext}" -b "$tbin" -s "$spec_type"
-# 	else
-# 		echo -e "\n\t ${ccf_file} does not exist, energyspec.py was NOT run.\n"
+	
+	if [ -e "${ccf_file}" ]; then
+		python "$ensp_exe_dir"/energyspec.py -i "${ccf_file}" -o "${out_file}.${tab_ext}" -b "$tbin" -s "$spec_type"
+	else
+		echo -e "\n\t ${ccf_file} does not exist, energyspec.py was NOT run.\n"
+	fi
+	
+	if [ -e "$rsp_matrix" ] && [ -e "${out_file}.${tab_ext}" ]; then
+		
+		cd "$out_dir"
+		ascii2pha infile="${out_end}.${tab_ext}" \
+			outfile="${out_end}.pha" \
+			chanpres=yes \
+			dtype=2 \
+			qerror=yes \
+			rows=- \
+			tlmin=0 \
+			detchans=64 \
+			pois=no \
+			telescope=RXTE \
+			instrume=PCA \
+			detnam=PCU2 \
+			filter=NONE \
+			exposure=$obs_time \
+			clobber=yes \
+			respfile="$rsp_matrix" > $dump_file
+		echo "XSPEC data: ${out_file}.pha"
+		echo -e "XSPEC resp: $rsp_matrix\n"
+	else
+		echo -e "\n\t${rsp_matrix} and/or ${out_file}.${tab_ext} do NOT exist, ascii2pha was NOT run.\n"
+	fi
+# 	if [ ! -e "${out_end}.pha" ]; then
+# 		echo -e "\n\tERROR: ASCII2pha didn't run, ${out_end}.pha does not exist.\n"
 # 	fi
-# 	
-# 	if [ -e "$rsp_matrix" ] && [ -e "${out_file}.${tab_ext}" ]; then
-# 		
-# 		cd "$out_dir"
-# 		ascii2pha infile="${out_end}.${tab_ext}" \
-# 			outfile="${out_end}.pha" \
-# 			chanpres=yes \
-# 			dtype=2 \
-# 			qerror=yes \
-# 			rows=- \
-# 			tlmin=0 \
-# 			detchans=64 \
-# 			pois=no \
-# 			telescope=RXTE \
-# 			instrume=PCA \
-# 			detnam=PCU2 \
-# 			filter=NONE \
-# 			exposure=$obs_time \
-# 			clobber=yes \
-# 			respfile="$rsp_matrix" > $dump_file
-# 		echo "XSPEC data: ${out_file}.pha"
-# 		echo -e "XSPEC resp: $rsp_matrix\n"
-# 	else
-# 		echo -e "\n\t${rsp_matrix} and/or ${out_file}.${tab_ext} do NOT exist, ascii2pha was NOT run.\n"
-# 	fi
-# # 	if [ ! -e "${out_end}.pha" ]; then
-# # 		echo -e "\n\tERROR: ASCII2pha didn't run, ${out_end}.pha does not exist.\n"
-# # 	fi
-# done
+done
