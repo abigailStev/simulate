@@ -144,19 +144,23 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, amp_ref
 	
     
 	## Making the signals
-	sine_ci, sine_ref = sim_lc.generate_sines(dt, n_bins, freq, amp_ci, \
+	sine_ci_bb, sine_ref_bb = sim_lc.generate_sines(dt, n_bins, freq, amp_ci, \
+		amp_ref, mean_ci, mean_ref, 0.0)
+	sine_ci_pl, sine_ref_pl = sim_lc.generate_sines(dt, n_bins, freq, amp_ci, \
 		amp_ref, mean_ci, mean_ref, phase_spec)
-	curve_ci_bb, curve_ref_bb = sim_lc.make_lightcurves(spec_bb, sine_ci, \
-		sine_ref, n_bins)
-	curve_ci_pl, curve_ref_pl = sim_lc.make_lightcurves(spec_pl, sine_ci, \
-		sine_ref, n_bins)
+	curve_ci_bb, curve_ref_bb = sim_lc.make_lightcurves(spec_bb, sine_ci_bb, \
+		sine_ref_bb, n_bins)
+	curve_ci_pl, curve_ref_pl = sim_lc.make_lightcurves(spec_pl, sine_ci_pl, \
+		sine_ref_pl, n_bins)
 	
 		
 	############################
 	## Looping through segments
 	############################
-	for num_segments in xrange(1, 41948): # tracks the number of segments
+# 	for num_segments in xrange(1, 41948): # tracks the number of segments
 # 	for num_segments in xrange(1, 612):  # tracks the number of segments
+	for num_segments in xrange(1, 15000): # tracks the number of segments
+
 
 		curve_ci, curve_ref = sim_lc.add_lightcurves(curve_ci_bb, curve_ref_bb,\
 			curve_ci_pl, curve_ref_pl, dt, exposure)
