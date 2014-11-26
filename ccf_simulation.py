@@ -215,7 +215,9 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, amp_ref
 	
 	t = np.arange(0, n_bins)
 
-	output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
+	output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, \
+		num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
+		mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
 	
 # 	sim_lc.plot_curves(n_bins, mean_curve_ci[:,6], mean_curve_ref, "plot.png")
 
@@ -261,5 +263,7 @@ if __name__ == "__main__":
 		present, only does a short test run.')
 	args = parser.parse_args()
 	
-	main(args.out_file, args.bb_spec, args.pl_spec, args.freq, args.dt_mult, args.num_seconds, args.amp_ci, args.amp_ref, args.mean_ci, args.mean_ref, args.phase_spec, args.test)
+	main(args.out_file, args.bb_spec, args.pl_spec, args.freq, args.dt_mult, \
+		args.num_seconds, args.amp_ci, args.amp_ref, args.mean_ci, \
+		args.mean_ref, args.phase_spec, args.test)
 	
