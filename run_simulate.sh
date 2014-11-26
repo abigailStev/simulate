@@ -1,7 +1,8 @@
 #!/bin/bash
 
 home_dir=$(ls -d ~)  # the -d flag is extremely important here
-day=$(date +%y%m%d)  # make the date a string and assign it to 'day'
+# day=$(date +%y%m%d)  # make the date a string and assign it to 'day'
+day=141031
 exe_dir="$home_dir/Dropbox/Research/simulate"
 out_dir="$exe_dir/out_sim"
 ccf_dir="$home_dir/Dropbox/Research/cross_correlation"
@@ -29,28 +30,27 @@ obs_time=0  # this is set down below
 # 	open -a ImageJ "$exe_dir/sim_power.png"
 # fi
 
-phase_spec=1.5708
-# phase_spec=3.1416
-ccf_file="$out_dir/${day}_pi2_ccf.dat"
-plot_root="$out_dir/${day}_pi2_ccf"
-ccfs_plot="$out_dir/${day}_pi2_ccfs.png"
+# phase_spec=1.5708  # radians
+phase_spec=3.1416    # radians
+ccf_file="$out_dir/${day}_ccf.dat"
+plot_root="$out_dir/${day}_ccf"
+ccfs_plot="$out_dir/${day}_ccfs.png"
 
 
-time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase_spec "$phase_spec" --test
+# time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase_spec "$phase_spec" #--test
 
-if [ -e "$ccf_file" ]; then
-	python "$ccf_dir/"plot_ccf.py "$ccf_file" -o "$plot_root" -p "FAKE"
-	open -a ImageJ "${plot_root}_chan_06.png"
-	python "$ccf_dir"/plot_multi.py "$ccf_file" "$ccfs_plot" "${numsec}"
-	open -a ImageJ "$ccfs_plot"
-fi
+# if [ -e "$ccf_file" ]; then
+# 	python "$ccf_dir/"plot_ccf.py "$ccf_file" -o "$plot_root" -p "FAKE"
+# 	open -a ImageJ "${plot_root}_chan_06.png"
+# 	python "$ccf_dir"/plot_multi.py "$ccf_file" "$ccfs_plot" "${numsec}"
+# 	open -a ImageJ "$ccfs_plot"
+# fi
 
 
 ensp_rsp_matrix="$home_dir/Dropbox/Research/energy_spectra/out_es/P70080_141029_70080-01-01-02_PCU2.rsp"
 rsp_matrix="$out_dir/P70080_141029_70080-01-01-02_PCU2.rsp"
 cp "$ensp_rsp_matrix" "$rsp_matrix"
 propID="P70080"
-day=$(date +%y%m%d)
 dt=1
 spec_type=1  # 0 for mean+ccf, 1 for ccf, 2 for mean
 tab_ext="dat"
@@ -68,9 +68,18 @@ else
 	echo -e "\n\t Couldn't get observation time from header, set obs_time to zero.\n"
 fi
 
+xspec_script="$out_dir/${day}_xspec.xcm"
+ccf_spectrum="${day}_ccf_nomean"
+
+if [ -e "$xspec_script" ]; then
+	rm "$xspec_script"
+fi
+touch "$xspec_script"
+i=1
+
 ## Generating energy spectra at each phase bin
 # for tbin in {25..40..5}; do  ## should work in bash 4.*, but i have 3.2.*
-for (( tbin=25; tbin<=45; tbin+=5 )); do
+for (( tbin=25; tbin<=40; tbin+=5 )); do
 # # 	echo "$tbin"
 	out_end="${day}_t${dt}_${numsec}sec_pbin_${tbin}"
 	out_end_mean="${day}_t${dt}_${numsec}sec_mean"
@@ -112,4 +121,19 @@ for (( tbin=25; tbin<=45; tbin+=5 )); do
 # 	if [ ! -e "${out_end}.pha" ]; then
 # 		echo -e "\n\tERROR: ASCII2pha didn't run, ${out_end}.pha does not exist.\n"
 # 	fi
+	echo "data $i:$i $out_end" >> $xspec_script
+	((i+=1))
 done
+
+# echo "data 1:1 141031_t1_4sec_pbin_25.pha 2:2 141031_t1_4sec_pbin_30.pha 3:3 141031_t1_4sec_pbin_35.pha 4:4 141031_t1_4sec_pbin_40.pha" > $xspec_script
+echo "ignore 1-4: **-3 11 27-**" >> $xspec_script
+echo "notice 1-4: 3 27" >> $xspec_script
+echo "cpd /xw" >> $xspec_script
+echo "setplot energy" >> $xspec_script
+echo "mod pow & 0" >> $xspec_script
+echo "iplot eeufspec" >> $xspec_script
+echo "@ccf_nomean.pco $ccf_spectrum" >> $xspec_script
+echo "exit" >> $xspec_script
+
+cd out_sim
+xspec < "$xspec_script"
