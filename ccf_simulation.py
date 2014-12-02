@@ -1,6 +1,8 @@
 import argparse
 import numpy as np
 from datetime import datetime
+from astropy.io import fits
+import os
 
 import ccf as crosscorr
 import powerspec
@@ -30,11 +32,69 @@ in the Anaconda package, https://store.continuum.io/cshop/anaconda/
 
 """
 ###############################################################################
-def output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, \
+def fits_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
 	num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
-	mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error):
+	mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error, noisy):
+	"""
+			fits_output
+	
+	
+	
+	"""
+	print "Output sent to %s" % out_file
+	## Making header
+	prihdr = fits.Header()
+	prihdr.set('TYPE', "Cross-correlation of simulation")
+	prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+	prihdr.set('BB_SPEC', bb_spec, "Blackbody (bb) spectrum file")
+	prihdr.set('PL_SPEC', pl_spec, "Power law (pl) spectrum file")
+	prihdr.set('SIG_FREQ', freq, "Hz; Frequency of simulated periodic signal")
+	prihdr.set('PHASE', phase, "radians; phase shift of pl from bb")
+	prihdr.set('AMP_CI', amp_ci, "Amplitude of signal in channels of interest")
+	prihdr.set('AMP_REF', amp_ref, "Amplitude of signal in reference band")
+	prihdr.set('MEAN_CI', mean_ci, "Mean of signal in channels of interest")
+	prihdr.set('MEAN_REF', mean_ref, "Mean of signal in reference band")
+	prihdr.set('DT', dt, "seconds")
+	prihdr.set('N_BINS', n_bins, "time bins per segment")
+	prihdr.set('SECONDS', num_seconds, "seconds per segment")
+	prihdr.set('SEGMENTS', num_segments, "segments in the whole light curve")
+	prihdr.set('EXPOSURE', num_segments * n_bins * dt, \
+		"seconds, of light curve")
+	prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
+	prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
+	prihdr.set('NOISY', noisy, "True if adding Poisson noise to simulation")
+	prihdu = fits.PrimaryHDU(header=prihdr)
+	
+	chan = np.arange(0,64)
+	energy_channels = np.tile(chan, len(t))
+	ccf_error = np.tile(ccf_error, len(t))
+	time_bins = np.repeat(t, len(chan))
+	assert len(energy_channels) == len(time_bins)
+	## Making FITS table
+	col1 = fits.Column(name='TIME_BIN', format='K', array=time_bins)
+	col2 = fits.Column(name='CCF', unit='Counts/second', format='D', \
+		array=ccf_filtered.real.flatten('C'))
+	col3 = fits.Column(name='ERROR', unit='', format='D', array=ccf_error)
+	col4 = fits.Column(name='CHANNEL', unit='', format='I', \
+		array=energy_channels)
+	cols = fits.ColDefs([col1, col2, col3, col4])
+	tbhdu = fits.BinTableHDU.from_columns(cols)
+	## If the file already exists, remove it (still working on just updating it)
+	assert out_file[-4:].lower() == "fits", 'ERROR: Output file must have extension ".fits".'
+	if os.path.isfile(out_file):
+		os.remove(out_file)
+	## Writing to a FITS file
+	thdulist = fits.HDUList([prihdu, tbhdu])
+	thdulist.writeto(out_file)	
+## End of function 'fits_output'
+
+	
+###############################################################################
+def dat_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
+	num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
+	mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error, noisy):
     """
-            output
+            dat_output
 
     Writes the simulation parameters and cross-correlation function to an output
     file.
@@ -43,7 +103,7 @@ def output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, \
     		bb_spec - 
     		pl_spec - 
     		freq - 
-    		phase_spec - 
+    		phase - 
             dt - Size of each time bin, in seconds.
             n_bins - Number of (time) bins per segment.
             num_seconds - Number of seconds in each Fourier segment.
@@ -71,7 +131,7 @@ def output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, \
         out.write("\n# Blackbody (bb) spectrum: %s" % bb_spec)
         out.write("\n# Power law (pl) spectrum: %s" % pl_spec)
         out.write("\n# Frequency of signal = %.2f Hz" % freq)
-        out.write("\n# Phase shift of PL with respect to BB = %f" % phase_spec)
+        out.write("\n# Phase shift of PL with respect to BB = %f" % phase)
         out.write("\n# Time bin size = %.21f seconds" % dt)
         out.write("\n# Number of bins per segment = %d" % n_bins)
         out.write("\n# Number of seconds per segment = %d" % num_seconds)
@@ -86,6 +146,7 @@ def output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, \
         	% str(list(mean_rate_whole_ci)))
         out.write("\n# Mean count rate of ref band = %.8f" \
                   % np.mean(mean_rate_whole_ref))
+        out.write("\n# Noisy = %s" % str(noisy))
         out.write("\n# ")
         out.write("\n# Column 1: Time bins")
         out.write("\n# Columns 2-65: Filtered ccf per energy channel, real \
@@ -102,10 +163,12 @@ def output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, \
         ## End of for-loops
     ## End of with-block
     
-## End of function 'output'
+## End of function 'dat_output'
+
 
 ###############################################################################
-def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, amp_ref, mean_ci, mean_ref, phase_spec, test):
+def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
+	amp_ref, mean_ci, mean_ref, phase, test, noisy):
 	"""
 			main
 			
@@ -147,7 +210,7 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, amp_ref
 	sine_ci_bb, sine_ref_bb = sim_lc.generate_sines(dt, n_bins, freq, amp_ci, \
 		amp_ref, mean_ci, mean_ref, 0.0)
 	sine_ci_pl, sine_ref_pl = sim_lc.generate_sines(dt, n_bins, freq, amp_ci, \
-		amp_ref, mean_ci, mean_ref, phase_spec)
+		amp_ref, mean_ci, mean_ref, phase)
 	curve_ci_bb, curve_ref_bb = sim_lc.make_lightcurves(spec_bb, sine_ci_bb, \
 		sine_ref_bb, n_bins)
 	curve_ci_pl, curve_ref_pl = sim_lc.make_lightcurves(spec_pl, sine_ci_pl, \
@@ -158,12 +221,12 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, amp_ref
 	## Looping through segments
 	############################
 # 	for num_segments in xrange(1, 41948): # tracks the number of segments
-# 	for num_segments in xrange(1, 612):  # tracks the number of segments
-	for num_segments in xrange(1, 15000): # tracks the number of segments
+	for num_segments in xrange(1, 101):  # tracks the number of segments
+# 	for num_segments in xrange(1, 15000): # tracks the number of segments
 
 
 		curve_ci, curve_ref = sim_lc.add_lightcurves(curve_ci_bb, curve_ref_bb,\
-			curve_ci_pl, curve_ref_pl, dt, exposure)
+			curve_ci_pl, curve_ref_pl, dt, exposure, noisy)
 		mean_curve_ci += curve_ci
 		mean_curve_ref += curve_ref
 		
@@ -208,21 +271,28 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, amp_ref
 	print "Mean count rate in reference band:", np.mean(mean_curve_ref)
 	ccf_filtered, ccf_error = crosscorr.cs_to_ccf_w_err(cs_avg, dt, n_bins, \
 		num_seconds, num_segments, mean_rate_whole_ci, mean_rate_whole_ref, \
-		mean_power_ci, mean_power_ref)
+		mean_power_ci, mean_power_ref, noisy)
 
 	ccf_filtered[np.where(np.isnan(ccf_filtered))] = 0.0
 	ccf_error[np.where(np.isnan(ccf_error))] = 0.0
 	
 	t = np.arange(0, n_bins)
-
-	output(out_file, bb_spec, pl_spec, freq, phase_spec, dt, n_bins, \
-		num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
-		mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error)
-	
+	if out_file[-3:].lower() == "dat":
+		dat_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
+			num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
+			mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, \
+			ccf_error, noisy)
+	elif out_file[-4:].lower() == "fits":
+		fits_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
+			num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
+			mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, \
+			ccf_error, noisy)
+	else:
+		raise Exception("ERROR: Output file must have extension .dat or .fits.")
 # 	sim_lc.plot_curves(n_bins, mean_curve_ci[:,6], mean_curve_ref, "plot.png")
 
 	sim_lc.power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, \
-		num_segments, mean_rate_ref)
+		num_segments, mean_rate_ref, noisy)
 	
 
 	
@@ -256,14 +326,16 @@ if __name__ == "__main__":
 	parser.add_argument('--amp_ref', type=tools.type_positive_float, \
 		default=0.2, dest='amp_ref', help='Fractional amplitude of the signal \
 		for the reference band. [0.2]')
-	parser.add_argument('--phase_spec', type=float, default=0.0, \
-		dest='phase_spec', help='Phase difference of the power law variability \
+	parser.add_argument('--phase', type=float, default=0.0, \
+		dest='phase', help='Phase difference of the power law variability \
 		to the blackbody variability in the energy spectrum. [0.0]')
 	parser.add_argument('--test', action='store_true', dest='test', help='If \
 		present, only does a short test run.')
+	parser.add_argument('--noisy', action='store_true', dest='noisy', help='If \
+		present, adds Poisson noise to the fake data.')
 	args = parser.parse_args()
 	
 	main(args.out_file, args.bb_spec, args.pl_spec, args.freq, args.dt_mult, \
 		args.num_seconds, args.amp_ci, args.amp_ref, args.mean_ci, \
-		args.mean_ref, args.phase_spec, args.test)
+		args.mean_ref, args.phase, args.test, args.noisy)
 	
