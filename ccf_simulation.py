@@ -221,8 +221,8 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 	## Looping through segments
 	############################
 # 	for num_segments in xrange(1, 41948): # tracks the number of segments
-	for num_segments in xrange(1, 101):  # tracks the number of segments
-# 	for num_segments in xrange(1, 15000): # tracks the number of segments
+# 	for num_segments in xrange(1, 101):  # tracks the number of segments
+	for num_segments in xrange(1, 15000): # tracks the number of segments
 
 
 		curve_ci, curve_ref = sim_lc.add_lightcurves(curve_ci_bb, curve_ref_bb,\
@@ -328,7 +328,7 @@ if __name__ == "__main__":
 		for the reference band. [0.2]')
 	parser.add_argument('--phase', type=float, default=0.0, \
 		dest='phase', help='Phase difference of the power law variability \
-		to the blackbody variability in the energy spectrum. [0.0]')
+		to the blackbody variability in the energy spectrum, in degrees. [0.0]')
 	parser.add_argument('--test', action='store_true', dest='test', help='If \
 		present, only does a short test run.')
 	parser.add_argument('--noisy', action='store_true', dest='noisy', help='If \
@@ -337,5 +337,5 @@ if __name__ == "__main__":
 	
 	main(args.out_file, args.bb_spec, args.pl_spec, args.freq, args.dt_mult, \
 		args.num_seconds, args.amp_ci, args.amp_ref, args.mean_ci, \
-		args.mean_ref, args.phase, args.test, args.noisy)
+		args.mean_ref, np.deg2rad(args.phase), args.test, args.noisy)
 	
