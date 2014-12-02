@@ -65,7 +65,7 @@ def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 	
 ###############################################################################
 def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
-	phase_spec):
+	phase):
 	"""
 			generate_sines
 		
@@ -85,7 +85,7 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 				noise-only process, set amp_ref = 0.
 			mean_ci - Mean of the sine wave signal for ci.
 			mean_ref - Mean of the sine wave signal for ref.
-			phase_spec - The phase shift for the power law variability, in 
+			phase - The phase shift for the power law variability, in 
 				radians?
 	
 	Returns: sine_ci - Relative sine wave signal for ci of length n_bins.
@@ -109,8 +109,8 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 	## Making two sine waves that are sampled over tiny_bins, so they're very 
 	## smooth.
 	tiny_bins = np.arange(0, n_bins, 0.1)
-	smooth_sine_ci = [ (amp_ci * np.sin(2.0 * np.pi * x / bins_per_period + phase_spec) + mean_ci) for x in tiny_bins] # in units 'rate'
-	smooth_sine_ref = [ (amp_ref * np.sin(2.0 * np.pi * x / bins_per_period + phase_spec) + mean_ref) for x in tiny_bins] # in units 'rate'
+	smooth_sine_ci = [ (amp_ci * np.sin(2.0 * np.pi * x / bins_per_period + phase) + mean_ci) for x in tiny_bins] # in units 'rate'
+	smooth_sine_ref = [ (amp_ref * np.sin(2.0 * np.pi * x / bins_per_period + phase) + mean_ref) for x in tiny_bins] # in units 'rate'
 
 	## Taking the average amplitude of every 10 bins of smooth_sine as the 
 	## value for sine
@@ -151,8 +151,7 @@ def read_fakeit_spectra(spec_file):
 		file_hdu = fits.open(spec_file)
 		spectrum = file_hdu[1].data.field('COUNTS')
 	else:
-		print "\n\tERROR: Spectrum format not recognized. Must be a fits file of type '.fak' or a text file of type '.dat'. Exiting."
-		exit()
+		raise Exception("ERROR: Spectrum format not recognized. Must be a fits file of type '.fak' or a text file of type '.dat'.")
 		
 	assert len(spectrum) == 64
 # 	print np.shape(spectrum)
@@ -164,7 +163,7 @@ def read_fakeit_spectra(spec_file):
 
 ###############################################################################
 def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
-	mean_rate_ref):
+	mean_rate_ref, noisy):
 	"""
 			power_spectra_things
 	
@@ -173,7 +172,7 @@ def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
 	"""
 	ps_freq, mean_ps_ref, leahy_power, rms2_power, rms2_err_power = \
 		powerspec.normalize(mean_ps_ref, n_bins, dt, num_seconds, num_segments,\
-		mean_rate_ref)
+		mean_rate_ref, noisy)
 	
 	np.savetxt( "sim_power.dat", mean_ps_ref)
 	fig, ax = plt.subplots()
@@ -227,7 +226,7 @@ def make_lightcurves(spec_xx, sine_ci, sine_ref, n_bins):
 
 ###############################################################################
 def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
-	exposure):
+	exposure, noisy):
 	"""
 			add_lightcurves
 	
@@ -240,6 +239,7 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 			curve_ref_pl - 
 			dt - 
 			exposure -
+			noisy - 
 	
 	Returns: noisy_curve_ci - 
 			 noisy_curve_ref - 
@@ -249,15 +249,17 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 	curve_ci = curve_ci_bb + curve_ci_pl
 	curve_ref = curve_ref_bb + curve_ref_pl
 	
-	## Adding Poisson noise to curve_ci and curve_ref, changing to 'count rate'
-	noisy_curve_ci = np.random.poisson(curve_ci * dt / exposure) / dt
-	noisy_curve_ref = np.random.poisson(curve_ref * dt / exposure) / dt
-	# Note: 'ValueError: lam < 0' means that 'np.random.poisson' is getting 
-	# negative values as its input.
-	
-# 	print "Mean noisy sine ci =", np.mean(noisy_curve_ci), ", mean noisy sine ref =", np.mean(noisy_curve_ref)
+	if noisy:
+		## Adding Poisson noise to curve_ci and curve_ref, changing to count rate units
+		noisy_curve_ci = np.random.poisson(curve_ci * dt / exposure) / dt
+		noisy_curve_ref = np.random.poisson(curve_ref * dt / exposure) / dt
+		return noisy_curve_ci, noisy_curve_ref
+	else:
+		## Not contributing poisson noise, but still changing to count rate units
+		rate_curve_ci = curve_ci / exposure
+		rate_curve_ref = curve_ref / exposure
+		return rate_curve_ci, rate_curve_ref
 
-	return noisy_curve_ci, noisy_curve_ref
 ## End of function 'add_lightcurves'
 
 
@@ -293,14 +295,16 @@ if __name__ == "__main__":
 	parser.add_argument('--amp_ref', type=tools.type_positive_float, \
 		default=0.5, dest='amp_ref', help='Fractional amplitude of the signal \
 		for the reference band. [0.5]')
-	parser.add_argument('--phase_spec', type=float, default=0.0, \
-		dest='phase_spec', help='Phase difference of the power law variability \
+	parser.add_argument('--phase', type=float, default=0.0, \
+		dest='phase', help='Phase difference of the power law variability \
 		to the blackbody variability in the energy spectrum. [0.0]')
 	parser.add_argument('--exposure', type=tools.type_positive_float, \
 		default=1000.0, dest='exposure', help='Exposure time of the \
 		observation, in seconds. [1000.0]')
 	parser.add_argument('--test', action='store_true', dest='test', help='If \
 		present, only does a short test run.')
+	parser.add_argument('--noisy', action='store_true', dest='noisy', help='If \
+		present, adds Poisson noise to the fake data.')
 	args = parser.parse_args()
 
 
@@ -318,17 +322,15 @@ if __name__ == "__main__":
 	mean_rate_ref = 0
 	
 	sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
-		args.amp_ref, args.mean_ci, args.mean_ref, args.phase_spec)
+		args.amp_ref, args.mean_ci, args.mean_ref, args.phase)
 	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref, n_bins)
 	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref, n_bins)
 		
-	for i in xrange(1, 601): # 'i' tracks the number of segments
-		
-		
+	for i in xrange(1, 201):  # 'i' tracks the number of segments
 # 		curve_ci_pl = curve_ci_bb
 # 		curve_ref_pl = curve_ref_bb
 		curve_ci, curve_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, \
-			curve_ci_pl, curve_ref_pl, dt, args.exposure)
+			curve_ci_pl, curve_ref_pl, dt, args.exposure, args.noisy)
 		mean_curve_ci += curve_ci
 		mean_curve_ref += curve_ref
 		ps_ref, rate_ref = powerspec.make_ps(curve_ref)
@@ -348,8 +350,8 @@ if __name__ == "__main__":
 	plot_curves(n_bins, mean_curve_ci[:,6], mean_curve_ref, "plot.png")
 
 	power_spectra_things(mean_ps_ref, dt, n_bins, args.num_seconds, i, \
-		mean_rate_ref)
+		mean_rate_ref, args.noisy)
 	
 ## End of main function
 
-## End of 'generate_sines.py'
+## End of 'simulate_lightcurves.py'
