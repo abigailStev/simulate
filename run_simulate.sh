@@ -7,6 +7,7 @@ exe_dir="$home_dir/Dropbox/Research/simulate"
 out_dir="$exe_dir/out_sim"
 ccf_dir="$home_dir/Dropbox/Research/cross_correlation"
 
+
 freq=401.0
 # bb_spec="spectra/100000s_mean.fak"
 # pl_spec="spectra/100000s_mean.fak"
@@ -17,6 +18,15 @@ amp_ref=0.055
 exposure=100000.0
 numsec=4
 obs_time=0  # this is set down below
+dt=1
+
+phase=90  # degrees
+# phase=180    # degrees
+# phase=0
+out_root="FAKE_${day}_t${dt}_${numsec}sec_phase${phase}"
+ccf_file="$out_dir/${out_root}_ccf.fits"
+plot_root="$out_dir/${out_root}_ccf"
+ccfs_plot="$out_dir/${out_root}_manyccfs.png"
 
 # python "$exe_dir"/simulate_lightcurves.py -h
 
@@ -30,15 +40,10 @@ obs_time=0  # this is set down below
 # 	open -a ImageJ "$exe_dir/sim_power.png"
 # fi
 
-# phase=1.5708  # radians
-# phase=3.1416    # radians
-phase=0
-ccf_file="$out_dir/F${day}_ccf.fits"
-plot_root="$out_dir/F${day}_ccf"
-ccfs_plot="$out_dir/F${day}_ccfs.png"
 
 
-time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase "$phase" --test # --noisy 
+
+time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase "$phase" # --test # --noisy 
 
 # if [ -e "$ccf_file" ]; then
 # 	python "$ccf_dir/"plot_ccf.py "$ccf_file" -o "$plot_root" -p "FAKE"
@@ -52,13 +57,11 @@ ensp_rsp_matrix="$home_dir/Dropbox/Research/energy_spectra/out_es/P70080_141029_
 rsp_matrix="$out_dir/P70080_141029_70080-01-01-02_PCU2.rsp"
 cp "$ensp_rsp_matrix" "$rsp_matrix"
 propID="FAKE"
-dt=1
 tab_ext="dat"
 ensp_exe_dir="$home_dir/Dropbox/Research/energy_spectra"
 ensp_out_dir="out_es"
 dump_file="dum.dat"
 
-out_root="FAKE_${day}_t${dt}_${numsec}sec"
 
 
 if [ -e "$ccf_file" ]; then
@@ -84,7 +87,7 @@ fi
 
 spec_type=1  # 0 for mean+ccf, 1 for ccf, 2 for mean
 xspec_script="$out_dir/${out_root}_xspec.xcm"
-spectrum_plot="${out_root}_ccf"
+spectrum_plot="${out_root}_spectrum_ccf"
 
 if [ -e "$xspec_script" ]; then
 	rm "$xspec_script"
@@ -152,7 +155,7 @@ cd "$out_dir"
 xspec < "$xspec_script" > "$dump_file"
 # echo "$spectrum_plot.eps"
 if [ -e "$spectrum_plot.eps" ]; then
-	awk '/%%EndComments/{print "%% phase = "'$phase'" radians, of PL wrt BB"}1' $spectrum_plot.eps > temp.eps
+	awk '/%%EndComments/{print "%% phase = "'$phase'" degrees, of PL wrt BB"}1' $spectrum_plot.eps > temp.eps
 	mv -f temp.eps "$spectrum_plot.eps"
 # 	open -a "TextWrangler" "$spectrum_plot.eps"
 	open "$spectrum_plot.eps"
@@ -163,7 +166,7 @@ fi
 ## Making ccf+mean spectra and plotting them
 spec_type=0  # 0 for mean+ccf, 1 for ccf, 2 for mean
 xspec_script="$out_dir/${out_root}_xspec.xcm"
-spectrum_plot="${out_root}_ccfwmean"
+spectrum_plot="${out_root}_spectrum_ccfwmean"
 
 if [ -e "$xspec_script" ]; then
 	rm "$xspec_script"
@@ -185,7 +188,7 @@ for (( tbin=25; tbin<=40; tbin+=5 )); do
 	if [ -e "${ccf_file}" ]; then
 		python "$ensp_exe_dir"/energyspec.py -i "${ccf_file}" -o "${out_end}.${tab_ext}" -b "$tbin" -s "$spec_type"
 	else
-		echo -e "\t ${ccf_file} does not exist, energyspec.py was NOT run."
+		echo -e "\t${ccf_file} does not exist, energyspec.py was NOT run."
 	fi
 	
 	if [ -e "$rsp_matrix" ] && [ -e "${out_end}.${tab_ext}" ]; then
@@ -230,7 +233,7 @@ echo "exit" >> $xspec_script
 cd "$out_dir"
 xspec < "$xspec_script" > "$dump_file"
 if [ -e "$spectrum_plot.eps" ]; then
-	awk '/%%EndComments/{print "%% phase = "'$phase'" radians, of PL wrt BB"}1' $spectrum_plot.eps > temp.eps
+	awk '/%%EndComments/{print "%% phase = "'$phase'" degrees, of PL wrt BB"}1' $spectrum_plot.eps > temp.eps
 	mv -f temp.eps "$spectrum_plot.eps"
 # 	open -a "TextWrangler" "$spectrum_plot.eps"
 	open "$spectrum_plot.eps"
