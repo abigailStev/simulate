@@ -20,7 +20,7 @@ numsec=4
 obs_time=0  # this is set down below
 dt=1
 
-phase=90  # degrees
+phase=45  # degrees
 # phase=180    # degrees
 # phase=0
 out_root="FAKE_${day}_t${dt}_${numsec}sec_phase${phase}"
@@ -28,30 +28,41 @@ ccf_file="$out_dir/${out_root}_ccf.fits"
 plot_root="$out_dir/${out_root}_ccf"
 ccfs_plot="$out_dir/${out_root}_manyccfs.png"
 
+
+#################################
+## Running simulate_lightcurves
+#################################
+
 # python "$exe_dir"/simulate_lightcurves.py -h
 
 # time python "$exe_dir"/simulate_lightcurves.py --freq "$freq" --bb "$bb_spec" --pl "$pl_spec" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --exposure "$exposure" --phase "$phase" #--test
 # 
-# # if [ -e "$exe_dir/plot.png" ]; then
-# # 	open -a ImageJ "$exe_dir/plot.png"
-# # fi
-# 
+# if [ -e "$exe_dir/plot.png" ]; then
+# 	open -a ImageJ "$exe_dir/plot.png"
+# fi
 # if [ -e "$exe_dir/sim_power.png" ]; then
 # 	open -a ImageJ "$exe_dir/sim_power.png"
 # fi
 
 
+###########################
+## Running ccf_simulation
+###########################
 
+time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase "$phase" --test # --noisy 
 
-time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase "$phase" # --test # --noisy 
+if [ -e "$ccf_file" ]; then
+	python "$ccf_dir/"plot_ccf.py "$ccf_file" -o "$plot_root" -p "FAKE"
+	open -a ImageJ "${plot_root}_chan_06.png"
+	python "$ccf_dir"/plot_multi.py "$ccf_file" "$ccfs_plot" "${numsec}"
+	open -a ImageJ "$ccfs_plot"
+fi
 
-# if [ -e "$ccf_file" ]; then
-# 	python "$ccf_dir/"plot_ccf.py "$ccf_file" -o "$plot_root" -p "FAKE"
-# 	open -a ImageJ "${plot_root}_chan_06.png"
-# 	python "$ccf_dir"/plot_multi.py "$ccf_file" "$ccfs_plot" "${numsec}"
-# 	open -a ImageJ "$ccfs_plot"
-# fi
-
+## If heainit isn't running, start it
+if (( $(echo $DYLD_LIBRARY_PATH | grep heasoft | wc -l) < 1 )); then
+	echo -e "\nStarting heainit"
+	. $HEADAS/headas-init.sh
+fi
 
 ensp_rsp_matrix="$home_dir/Dropbox/Research/energy_spectra/out_es/P70080_141029_70080-01-01-02_PCU2.rsp"
 rsp_matrix="$out_dir/P70080_141029_70080-01-01-02_PCU2.rsp"
