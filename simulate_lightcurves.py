@@ -349,10 +349,7 @@ if __name__ == "__main__":
 	extra_bin_choices = np.arange(int(extra_bins))
 	
 	for i in xrange(1, 101):  # 'i' tracks the number of segments
-# 		curve_ci_pl = curve_ci_bb
-# 		curve_ref_pl = curve_ref_bb
 		start_bin = np.random.choice(extra_bin_choices)
-# 		print len(curve_ci_bb[start_bin:n_bins+start_bin])
 		
 		curve_ci, curve_ref = add_lightcurves(curve_ci_bb[start_bin:n_bins+start_bin], \
 			curve_ref_bb[start_bin:n_bins+start_bin], \
