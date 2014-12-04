@@ -207,16 +207,19 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 	
     
 	## Making the signals
-	sine_ci_bb, sine_ref_bb = sim_lc.generate_sines(dt, n_bins, freq, amp_ci, \
-		amp_ref, mean_ci, mean_ref, 0.0)
-	sine_ci_pl, sine_ref_pl = sim_lc.generate_sines(dt, n_bins, freq, amp_ci, \
-		amp_ref, mean_ci, mean_ref, phase)
+	sine_ci_bb, sine_ref_bb, extra_bins_bb = sim_lc.generate_sines(dt, n_bins, \
+		freq, amp_ci, amp_ref, mean_ci, mean_ref, 0.0)
+	sine_ci_pl, sine_ref_pl, extra_bins_pl = sim_lc.generate_sines(dt, n_bins, \
+		freq, amp_ci, amp_ref, mean_ci, mean_ref, phase)	
 	curve_ci_bb, curve_ref_bb = sim_lc.make_lightcurves(spec_bb, sine_ci_bb, \
-		sine_ref_bb, n_bins)
+		sine_ref_bb, n_bins+extra_bins_bb)
 	curve_ci_pl, curve_ref_pl = sim_lc.make_lightcurves(spec_pl, sine_ci_pl, \
-		sine_ref_pl, n_bins)
+		sine_ref_pl, n_bins+extra_bins_pl)
 	
-		
+	assert extra_bins_bb == extra_bins_pl, \
+		"Number of extra time bins in BB don't equal extra bins in PL."
+	extra_bin_choices = np.arange(int(extra_bins_bb))
+	
 	############################
 	## Looping through segments
 	############################
@@ -224,9 +227,12 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 # 	for num_segments in xrange(1, 101):  # tracks the number of segments
 	for num_segments in xrange(1, 15000): # tracks the number of segments
 
+		start_bin = np.random.choice(extra_bin_choices)
 
-		curve_ci, curve_ref = sim_lc.add_lightcurves(curve_ci_bb, curve_ref_bb,\
-			curve_ci_pl, curve_ref_pl, dt, exposure, noisy)
+		curve_ci, curve_ref = sim_lc.add_lightcurves(curve_ci_bb[start_bin:n_bins+start_bin], \
+			curve_ref_bb[start_bin:n_bins+start_bin],\
+			curve_ci_pl[start_bin:n_bins+start_bin], \
+			curve_ref_pl[start_bin:n_bins+start_bin], dt, exposure, noisy)
 		mean_curve_ci += curve_ci
 		mean_curve_ref += curve_ref
 		
