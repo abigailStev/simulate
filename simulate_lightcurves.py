@@ -42,8 +42,8 @@ def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 	ax.plot(bins, curve_ci, linewidth=1.5, label="Curve 'ci'")
 	ax.plot(bins, curve_ref, linewidth=1.5, label="Curve 'ref'")
 	plt.xlim(0, 30)
-	plt.xlabel('Bins')
-	plt.ylabel('Photon count rate')
+	plt.xlabel('Arbitrary time bins')
+	plt.ylabel('Count rate')
 
 	## The following legend code was found on stack overflow I think, 
 	## or a pyplot tutorial
@@ -60,9 +60,55 @@ def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 
 # 	plt.show()
 	
-	## End function 'plot_curves'
+## End function 'plot_curves'
 	
 	
+###############################################################################
+def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
+	mean_rate_ref, noisy):
+	"""
+			power_spectra_things
+	
+	Computes power spectrum things and plots the power spectrum.
+	
+	"""
+	ps_freq, mean_ps_ref, leahy_power, rms2_power, rms2_err_power = \
+		powerspec.normalize(mean_ps_ref, n_bins, dt, num_seconds, num_segments,\
+		mean_rate_ref, noisy)
+	
+	np.savetxt( "sim_power.dat", mean_ps_ref)
+	fig, ax = plt.subplots()
+	ax.plot(ps_freq, rms2_power, linewidth=2)
+# 	ax.plot(ps_freq, leahy_power-2, linewidth=2)
+	plt.xlabel(r'$\nu$ [Hz]')
+	plt.ylabel(r'Noise-subtracted fractional rms$^2$ power')
+	plt.xlim(0,800)
+	plt.ylim(0,)
+	# plt.xscale('symlog') # this works much better than 'log'
+	# plt.yscale('symlog')
+	plt.title("Power spectrum")
+	plt.savefig("sim_power.png", dpi=120)
+# 	plt.show()
+	plt.close()
+## End of function 'power_spectra_things'
+	
+	
+###############################################################################
+def determine_extra_bins(bpp):
+	"""
+	
+	"""
+	
+	i = 1
+	while np.abs(bpp*i - np.rint(bpp*i)) > 0.1 and \
+		np.abs(bpp*i - np.rint(bpp*i)) < 0.9 and i < 100:
+		i+= 1
+	
+	print np.rint(bpp*i)
+	return np.rint(bpp*i)
+## End of function 'determine_extra_bins'
+	
+
 ###############################################################################
 def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 	phase):
@@ -105,25 +151,27 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 				  # what gets Poisson noise
 	sine_ref = []  # Averaged smooth_sine_ref over every 10 tiny_bins; this is 
 				   # what gets Poisson noise
-
+	
+	extra_bins = determine_extra_bins(bins_per_period)
+	
 	## Making two sine waves that are sampled over tiny_bins, so they're very 
 	## smooth.
-	tiny_bins = np.arange(0, n_bins, 0.1)
-	smooth_sine_ci = [ (amp_ci * np.sin(2.0 * np.pi * x / bins_per_period + phase) + mean_ci) for x in tiny_bins] # in units 'rate'
-	smooth_sine_ref = [ (amp_ref * np.sin(2.0 * np.pi * x / bins_per_period + phase) + mean_ref) for x in tiny_bins] # in units 'rate'
+	tiny_bins = np.arange(0, n_bins+extra_bins, 0.1)
 
-	## Taking the average amplitude of every 10 bins of smooth_sine as the 
-	## value for sine
-	i = 0
-	j = 10
-	while j <= len(tiny_bins):
-		sine_ci.append(np.mean(smooth_sine_ci[i:j]))
-		sine_ref.append(np.mean(smooth_sine_ref[i:j]))
-		i = j
-		j += 10
-	## End of while loop
+	smooth_sine_ci = amp_ci * np.sin(2.0 * np.pi * tiny_bins / bins_per_period + phase) + mean_ci
+	smooth_sine_ref = amp_ref * np.sin(2.0 * np.pi * tiny_bins / bins_per_period + phase) + mean_ref
 	
-	return sine_ci, sine_ref
+	
+	
+	
+	
+	sine_ci = np.mean(np.array_split(smooth_sine_ci, n_bins+extra_bins), axis=1)
+	sine_ref = np.mean(np.array_split(smooth_sine_ref, n_bins+extra_bins), axis=1)
+	
+# 	print np.shape(sine_ci)
+# 	print np.shape(sine_ref)
+	
+	return sine_ci, sine_ref, extra_bins
 		
 ## End of function 'generate_sines'
 
@@ -159,36 +207,6 @@ def read_fakeit_spectra(spec_file):
 
 	return spectrum
 ## End of function 'read_fakeit_spectra'
-	
-
-###############################################################################
-def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
-	mean_rate_ref, noisy):
-	"""
-			power_spectra_things
-	
-	Computes power spectrum things and plots the power spectrum.
-	
-	"""
-	ps_freq, mean_ps_ref, leahy_power, rms2_power, rms2_err_power = \
-		powerspec.normalize(mean_ps_ref, n_bins, dt, num_seconds, num_segments,\
-		mean_rate_ref, noisy)
-	
-	np.savetxt( "sim_power.dat", mean_ps_ref)
-	fig, ax = plt.subplots()
-	ax.plot(ps_freq, rms2_power, linewidth=2)
-# 	ax.plot(ps_freq, leahy_power-2, linewidth=2)
-	plt.xlabel(r'$\nu$ [Hz]')
-	plt.ylabel(r'Noise-subtracted fractional rms$^2$ power')
-	plt.xlim(0,800)
-	plt.ylim(0,)
-	# plt.xscale('symlog') # this works much better than 'log'
-	# plt.yscale('symlog')
-	plt.title("Power spectrum")
-	plt.savefig("sim_power.png", dpi=120)
-# 	plt.show()
-	plt.close()
-## End of function 'power_spectra_things'
 
 
 ###############################################################################
@@ -321,16 +339,26 @@ if __name__ == "__main__":
 	mean_ps_ref = 0
 	mean_rate_ref = 0
 	
-	sine_ci, sine_ref = generate_sines(dt, n_bins, args.freq, args.amp_ci, \
-		args.amp_ref, args.mean_ci, args.mean_ref, args.phase)
-	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref, n_bins)
-	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref, n_bins)
-		
-	for i in xrange(1, 201):  # 'i' tracks the number of segments
+	sine_ci, sine_ref, extra_bins = generate_sines(dt, n_bins, args.freq, \
+		args.amp_ci, args.amp_ref, args.mean_ci, args.mean_ref, args.phase)
+	curve_ci_bb, curve_ref_bb = make_lightcurves(spec_bb, sine_ci, sine_ref, \
+		n_bins+extra_bins)
+	curve_ci_pl, curve_ref_pl = make_lightcurves(spec_pl, sine_ci, sine_ref, \
+		n_bins+extra_bins)
+	
+	extra_bin_choices = np.arange(int(extra_bins))
+	
+	for i in xrange(1, 101):  # 'i' tracks the number of segments
 # 		curve_ci_pl = curve_ci_bb
 # 		curve_ref_pl = curve_ref_bb
-		curve_ci, curve_ref = add_lightcurves(curve_ci_bb, curve_ref_bb, \
-			curve_ci_pl, curve_ref_pl, dt, args.exposure, args.noisy)
+		start_bin = np.random.choice(extra_bin_choices)
+# 		print len(curve_ci_bb[start_bin:n_bins+start_bin])
+		
+		curve_ci, curve_ref = add_lightcurves(curve_ci_bb[start_bin:n_bins+start_bin], \
+			curve_ref_bb[start_bin:n_bins+start_bin], \
+			curve_ci_pl[start_bin:n_bins+start_bin], \
+			curve_ref_pl[start_bin:n_bins+start_bin], dt, args.exposure, \
+			args.noisy)
 		mean_curve_ci += curve_ci
 		mean_curve_ref += curve_ref
 		ps_ref, rate_ref = powerspec.make_ps(curve_ref)
