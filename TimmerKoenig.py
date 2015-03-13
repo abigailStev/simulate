@@ -212,7 +212,8 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor):
 	
 	for i in range(num_seg):
 	
-		noise_power, FT = make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate)
+		noise_power, FT = make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins,\
+			noise_mean_rate)
 # 		sum_power += noise_power
 		
 		noise_lc = fftpack.ifft(FT).real + noise_mean_rate
