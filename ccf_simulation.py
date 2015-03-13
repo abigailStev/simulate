@@ -3,42 +3,34 @@ import numpy as np
 from datetime import datetime
 from astropy.io import fits
 import os
-
 import ccf as crosscorr
-import powerspec
-import tools
-import simulate_lightcurves as sim_lc
+import powerspec  # https://github.com/abigailStev/power_spectra
+import tools  # https://github.com/abigailStev/whizzy_scripts
+import simulate_lightcurves as sim_lc  
 import plot_ccf
+
+__author__ = "Abigail Stevens"
+__author_email__ = "A.L.Stevens at uva.nl"
+__year__ = "2014-2015"
+__description__ = "Simulates two light curves from fake spectra and computes \
+their cross-correlation function."
 
 """
 		ccf_simulation.py
 
-Simulates two light curves from fake spectra and computes their cross-
-correlation function. 
-
-Required arguments:
-out_file - Name of (ASCII/txt/dat) output file which the table of
-    cross-correlation function data will be written to.
-    
-Optional arguments:
-test - If present, does a single run. If not, does a full run. 
-
-Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
-
-All scientific modules imported above, as well as python 2.7, can be downloaded
-in the Anaconda package, https://store.continuum.io/cshop/anaconda/
-
-'tools', 'simulate_lightcurves', 'plot_ccf', 'ccf', and 'powerspec' are available on GitHub. 
+Written in Python 2.7.
 
 """
-###############################################################################
-def fits_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
+
+################################################################################
+def fits_out(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
 	num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
 	mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error, noisy):
 	"""
-			fits_output
+			fits_out
 	
-	
+	Writes the simulation parameters and cross-correlation function to a .fits
+    output file.
 	
 	"""
 	print "Output sent to %s" % out_file
@@ -86,41 +78,18 @@ def fits_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
 	## Writing to a FITS file
 	thdulist = fits.HDUList([prihdu, tbhdu])
 	thdulist.writeto(out_file)	
-## End of function 'fits_output'
+## End of function 'fits_out'
 
 	
 ###############################################################################
-def dat_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
+def dat_out(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
 	num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
 	mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, ccf_error, noisy):
     """
-            dat_output
+            dat_out
 
-    Writes the simulation parameters and cross-correlation function to an output
-    file.
-
-    Passed: out_file - Name of output file.
-    		bb_spec - 
-    		pl_spec - 
-    		freq - 
-    		phase - 
-            dt - Size of each time bin, in seconds.
-            n_bins - Number of (time) bins per segment.
-            num_seconds - Number of seconds in each Fourier segment.
-            num_segments - Number of segments the light curve was split up into.
-            amp_ci - 
-            amp_ref - 
-            mean_ci - 
-            mean_ref - 
-            mean_rate_whole_ci - Mean count rate of light curve 1, averaged over
-                all segments.
-            mean_rate_whole_ref - Mean count rate of light curve 2, averaged
-                over all segments.
-            t - Integer time bins to plot against the ccf.
-            ccf_filtered - CCF amplitudes, filtered in frequency space.
-            ccf_error - Error on the filtered CCF.
-
-    Returns: nothing
+    Writes the simulation parameters and cross-correlation function to a .dat 
+    output file.
 
     """
     print "Output sent to %s" % out_file
@@ -163,35 +132,24 @@ def dat_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
         ## End of for-loops
     ## End of with-block
     
-## End of function 'dat_output'
+## End of function 'dat_out'
 
 
-###############################################################################
+################################################################################
 def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 	amp_ref, mean_ci, mean_ref, phase, test, noisy):
 	"""
 			main
-			
-	Summary.
-	
-	Passed: 
-	
-	Returns:
-	
+		
 	"""
+	
+	###################
+	## Initializations
+	###################
+	
 	t_res = 1.0 / 8192.0  # The time resolution of the data, in seconds.
 	dt = dt_mult * t_res
 	n_bins = num_seconds * int(1.0 / dt)
-	assert tools.power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
-	
-	exposure_bb = float(tools.get_key_val(bb_spec, 1, "EXPOSURE"))
-	exposure_pl = float(tools.get_key_val(pl_spec, 1, "EXPOSURE"))
-	assert exposure_bb == exposure_pl
-	exposure = exposure_bb
-	
-	spec_bb = sim_lc.read_fakeit_spectra(bb_spec)
-	spec_pl = sim_lc.read_fakeit_spectra(pl_spec)
-	
 	mean_curve_ci = 0
 	mean_curve_ref = 0
 	mean_ps_ref = 0
@@ -205,8 +163,29 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 	ccf_filtered = np.zeros((n_bins, 64))
 	cs_sum = np.zeros((n_bins, 64), dtype=np.complex128)
 	
-    
+	################
+	## Idiot checks
+	################
+	
+	assert tools.power_of_two(n_bins), \
+		"ERROR: n_bins must be a power of 2 for the FFT."
+	
+	###################################
+	## Reading the fake energy spectra
+	###################################
+	
+	exposure_bb = float(tools.get_key_val(bb_spec, 1, "EXPOSURE"))
+	exposure_pl = float(tools.get_key_val(pl_spec, 1, "EXPOSURE"))
+	assert exposure_bb == exposure_pl, "ERROR: Exposure times not the same."
+	exposure = exposure_bb
+	
+	spec_bb = sim_lc.read_fakeit_spectra(bb_spec)
+	spec_pl = sim_lc.read_fakeit_spectra(pl_spec)
+	
+    ######################
 	## Making the signals
+	######################
+	
 	sine_ci_bb, sine_ref_bb, extra_bins_bb = sim_lc.generate_sines(dt, n_bins, \
 		freq, amp_ci, amp_ref, mean_ci, mean_ref, 0.0)
 	sine_ci_pl, sine_ref_pl, extra_bins_pl = sim_lc.generate_sines(dt, n_bins, \
@@ -217,18 +196,18 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 		sine_ref_pl, n_bins+extra_bins_pl)
 	
 	assert extra_bins_bb == extra_bins_pl, \
-		"Number of extra time bins in BB don't equal extra bins in PL."
+		"ERROR: Number of extra time bins in BB don't equal extra bins in PL."
 	extra_bin_choices = np.arange(int(extra_bins_bb))
 	
 	############################
 	## Looping through segments
 	############################
-# 	for num_segments in xrange(1, 41948): # tracks the number of segments
+	
+	for num_segments in xrange(1, 41948): # tracks the number of segments
 # 	for num_segments in xrange(1, 101):  # tracks the number of segments
-	for num_segments in xrange(1, 15000): # tracks the number of segments
+# 	for num_segments in xrange(1, 15000): # tracks the number of segments
 
 		start_bin = np.random.choice(extra_bin_choices)
-
 		curve_ci, curve_ref = sim_lc.add_lightcurves(curve_ci_bb[start_bin:n_bins+start_bin], \
 			curve_ref_bb[start_bin:n_bins+start_bin],\
 			curve_ci_pl[start_bin:n_bins+start_bin], \
@@ -263,7 +242,10 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 		
 	## End of for-loop
 	
-	## Averages
+	###################
+	## Taking averages
+	###################
+	
 	mean_ps_ref /= float(num_segments)
 	mean_rate_ref /= float(num_segments)
 	mean_curve_ci /= float(num_segments)
@@ -284,12 +266,12 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 	
 	t = np.arange(0, n_bins)
 	if out_file[-3:].lower() == "dat":
-		dat_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
+		dat_out(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
 			num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
 			mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, \
 			ccf_error, noisy)
 	elif out_file[-4:].lower() == "fits":
-		fits_output(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
+		fits_out(out_file, bb_spec, pl_spec, freq, phase, dt, n_bins, \
 			num_seconds, num_segments, amp_ci, amp_ref, mean_ci, mean_ref, \
 			mean_rate_whole_ci, mean_rate_whole_ref, t, ccf_filtered, \
 			ccf_error, noisy)
@@ -299,11 +281,16 @@ def main(out_file, bb_spec, pl_spec, freq, dt_mult, num_seconds, amp_ci, \
 
 	sim_lc.power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, \
 		num_segments, mean_rate_ref, noisy)
-	
+		
+## End of function 'main'
 
 	
-###############################################################################
+################################################################################
 if __name__ == "__main__":
+
+	############################################
+	## Parsing input arguments and calling main
+	############################################
 	
 	parser = argparse.ArgumentParser(description='Simulates a light curve and \
 		runs it through ccf.py.')
@@ -344,4 +331,5 @@ if __name__ == "__main__":
 	main(args.out_file, args.bb_spec, args.pl_spec, args.freq, args.dt_mult, \
 		args.num_seconds, args.amp_ci, args.amp_ref, args.mean_ci, \
 		args.mean_ref, np.deg2rad(args.phase), args.test, args.noisy)
-	
+
+################################################################################
