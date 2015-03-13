@@ -26,7 +26,6 @@ def lc_out(dt, lightcurve):
 	
 	"""
 	time_bins = np.arange(len(lightcurve))
-	print len(time_bins)
 	time = time_bins * dt
 	
 	out_data = np.column_stack((time, lightcurve))
@@ -131,7 +130,15 @@ def inv_frac_rms2_norm(amplitudes, dt, n_bins, mean_rate):
 	inv_rms2 = amplitudes * dt * n_bins * mean_rate ** 2 / 2.0
 	return inv_rms2
 
-
+################################################################################
+def inv_leahy_norm(amplitudes, dt, n_bins, mean_rate):
+	"""
+	leahy_power = 2.0 * power / dt / float(n_bins) / (mean_rate ** 2)
+	"""
+	inv_leahy = amplitudes * dt * n_bins * mean_rate / 2.0
+	return inv_leahy
+	
+	
 ################################################################################
 def make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate):
 	"""
@@ -150,25 +157,23 @@ def make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate):
 
 	FT_pos = r_values + i_values*1j
 	FT_neg = np.conj(FT_pos[1:-1]) 
-
+	FT_neg = FT_neg[::-1]
+# 	print FT_pos
+# 	print FT_neg
+	
 	FT = np.append(FT_pos, FT_neg)
 	FT = inv_frac_rms2_norm(FT, dt, n_bins, noise_mean_rate)
-	
-# 	return FT
+# 	FT = inv_leahy_norm(FT, dt, n_bins, noise_mean_rate)
 	
 	noise_unnorm_power = np.absolute(FT) ** 2
-# 	print "FT type:", type(FT[0])
-# 	print "Power type:", type(noise_unnorm_power[0])
+	noise_unnorm_power[np.where(noise_unnorm_power < 0)] = 0
+
 	return noise_unnorm_power, FT
-	
-# 	noise_unnorm_power[np.where(noise_unnorm_power < 0)] = 0
-# 	noise_power = 2.0 * noise_unnorm_power * dt / float(n_bins) / (noise_mean_rate ** 2)
-	
-# 	return noise_power
+## End of function 'make_noise_seg'
 	
 	
 ################################################################################
-def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_variance):
+def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor):
 	"""
 	
 	"""
@@ -184,26 +189,22 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_variance):
 	## For QPOs, Q factor is w_0 / gamma
 	w_1 = 5.4651495  ## Centroid frequency of QPO
 	gamma_1 = 0.8835579  ## FWHM of QPO
-	
+	noise_psd_scalefactor=1e-6  ## Don't know if I'm multiplying variance in the 
+							 ## correct place, but it's at least a scale factor.
 	
 	##########################################
 	## Making an array of Fourier frequencies
 	##########################################
 	
-	frequencies = np.arange(float(-n_bins/2)+1, float(n_bins/2)+1)
-	frequencies = frequencies * df # gives a freq resolution better than 1 Hz
-
+	frequencies = np.arange(float(-n_bins/2)+1, float(n_bins/2)+1) * df
 	pos_freq = frequencies[np.where(frequencies >= 0)]  
 	## positive should have 2 more than negative, because of the 0 freq and the 
 	## nyquist freq
 	neg_freq = frequencies[np.where(frequencies < 0)]
-	nyquist = pos_freq[-1]
-	print nyquist
-	print len(pos_freq)
-	print len(neg_freq)
-	
-# 	noise_psd_shape = noise_psd_variance * lorentzian(pos_freq, w_1, gamma_1)
-	noise_psd_shape = noise_psd_variance * (lorentzian(pos_freq, w_1, gamma_1) + 0.1*powerlaw(pos_freq, beta))
+	nyquist = np.max(np.abs(frequencies))
+
+# 	noise_psd_shape = noise_psd_scalefactor * lorentzian(pos_freq, w_1, gamma_1)
+	noise_psd_shape = noise_psd_scalefactor * (lorentzian(pos_freq, w_1, gamma_1) + 0.1*powerlaw(pos_freq, beta))
 	
 	##########################################################################
 	## Making a new power spectrum from new random variables for each segment
@@ -214,10 +215,17 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_variance):
 		noise_power, FT = make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate)
 # 		sum_power += noise_power
 		
-		## Can't use ifft(FT).real. That gives the high freq spike issues.
-		noise_lc = fftpack.ifft(FT)+ noise_mean_rate
-		noise_power = np.abs(fftpack.fft(noise_lc)) ** 2
-		print type(noise_lc[3])
+		noise_lc = fftpack.ifft(FT).real + noise_mean_rate
+		noise_lc[np.where(noise_lc < 0)] = 0.0
+		
+		## Haven't figured out how to scale this -- dt? exposure? both? neither?
+# 		noise_lc = np.random.poisson(noise_lc * dt) / dt
+		noise_lc = np.random.poisson(noise_lc)
+		
+		
+		real_mean = np.mean(noise_lc)
+		noise_power = np.abs(fftpack.fft(noise_lc-real_mean)) ** 2
+
 		sum_power += noise_power
 		
 		total_noise_lc = np.append(total_noise_lc, noise_lc)
@@ -226,9 +234,8 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_variance):
 	
 	power = sum_power / float(num_seg)
 	power = power[0:len(pos_freq)]
-	power = 2.0 * power * dt / float(n_bins) / (noise_mean_rate ** 2)
-	
-# 	print np.mean(noise_lc)
+	power = 2.0 * power * dt / float(n_bins) / (noise_mean_rate ** 2)  ## Fractional rms^2 normalization
+# 	power = 2.0 * power * dt / float(n_bins) / (noise_mean_rate)  ## Leahy normalization
 	
 	##########
 	## Output
