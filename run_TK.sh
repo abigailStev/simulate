@@ -3,6 +3,8 @@
 home_dir=$(ls -d ~)
 sim_dir="$home_dir/Dropbox/Research/simulate"
 pow_dir="$home_dir/Dropbox/Research/power_spectra"
+ccf_dir="$home_dir/Dropbox/Research/cross_correlation"
+out_dir="$sim_dir/out_sim"
 
 prefix="FAKE-TK-GX339B"
 day=$(date +%y%m%d)  # make the date a string and assign it to 'day'
@@ -12,17 +14,41 @@ dt=0.0078125
 rebin_const=1.01
 meanrate=2331.0
 numsegments=267
-variance=4.61214030908e-07
+# numsegments=10
+# variance=4.61214030908e-07
+# variance=2.1273510648e-07
+variance=9e-6
+pl_scale=3.29617761e-04
+qpo_scale=2.06908556e-02
+# pl_scale=0.00033744
+# qpo_scale=0.02769814
 
 cd "$sim_dir"
 
-python "$sim_dir"/TimmerKoenig.py "$nbins" "$dt" "$meanrate" "$numsegments" "$variance"
+for (( i=0; i<2; i++ )); do
+	pow_out="$out_dir/TK_power_${i}.fits"
+	ccf_out="$out_dir/TK_ccf_${i}.fits"
+	pow_rb_out="$out_dir/TK_power_rb_${i}.fits"
+	pow_plot="$out_dir/TK_psd_${i}.png"
+	pow_rb_plot="$out_dir/TK_psd_rb_${i}.png"
+	ccf_plot="$out_dir/TK_ccf_${i}"
+	ccf_2D_plot="$out_dir/TK_ccf_2D_${i}.png"
+	
+	echo "$i"
+	time python "$sim_dir"/TimmerKoenig.py "$nbins" "$dt" "$meanrate" \
+		"$numsegments" "$variance" "$pl_scale" "$qpo_scale" "$pow_out" "$ccf_out"
 
-# python "$pow_dir"/plot_powerspec.py "$sim_dir"/TK_power.fits \
-# 		-o "$sim_dir"/TK_psd.png -p "$prefix"
+	python "$pow_dir"/plot_powerspec.py "$pow_out" -o "$pow_plot" -p "$prefix"
+	# if [ -e "$pow_plot" ]; then open "$pow_plot"; fi
 
-python "$pow_dir"/rebin_powerspec.py "$sim_dir"/TK_power.fits \
-		"$sim_dir"/TK_power_rb.fits -o "$sim_dir"/TK_psd_rb.png -p "$prefix" \
-		-c "$rebin_const"
+	python "$pow_dir"/rebin_powerspec.py "$pow_out" "$pow_rb_out" -o "$pow_rb_plot"\
+		-p "$prefix" -c "$rebin_const"
+	if [ -e "$pow_rb_plot" ]; then open "$pow_rb_plot"; fi
 
-if [ -e "$sim_dir/TK_psd_rb.png" ]; then open "$sim_dir/TK_psd_rb.png"; fi
+	if [ -e "$ccf_out" ]; then
+		python "$ccf_dir"/plot_ccf.py "$ccf_out" -o "$ccf_plot" -p "$prefix" 
+	# 	if [ -e "$ccf_plot"_chan_06.png ]; then open "$ccf_plot"_chan_06.png; fi
+		python "$ccf_dir"/plot_2d.py "$ccf_out" -o "$ccf_2D_plot" -p "${prefix}"
+		if [ -e "$ccf_2D_plot" ]; then open "$ccf_2D_plot"; fi
+	fi
+done
