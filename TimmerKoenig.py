@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import itertools
 from astropy.io import fits
 import ccf as xcf
+import simulate_lightcurves as simlc
 
 __author__ = "Abigail Stevens"
 __author_email__ = "A.L.Stevens at uva.nl"
@@ -169,12 +170,12 @@ def sim_table_out(ccf):
 	"""
 			sim_table_out
 		
-	Writes the first 45 elements (not including 0) of the ccf to a table.
+	Writes the first 65 elements (not including 0) of the ccf to a table.
 	
 	"""
 	out_file="./TK_simulation_table.dat"
 	with open(out_file, 'a') as out:
-		for element in ccf[1:46,2]:
+		for element in ccf[0:100,2]:
 			out.write("%.6e\t" % element.real)
 		out.write("\n")
 ## End of function 'sim_table_out'
@@ -185,8 +186,11 @@ def powerlaw(w, beta):
 	"""
     Gives a powerlaw of (1/w)^beta
     """
-	pl = np.where(w != 0, w ** (beta), np.inf) 
+	pl = np.zeros(len(w))
+	pl[1:] = w[1:] ** (beta)
+	pl[0] = np.inf
 	return pl
+
 
 ################################################################################    
 def lorentzian(w, w_0, gamma):
@@ -198,9 +202,12 @@ def lorentzian(w, w_0, gamma):
 	L = numerator / denominator
 	return L
 
+
 ################################################################################
 def gaussian(w, mean, std_dev):
-	## p[0] = mean value, p[1] = standard deviation, p[2] = scale factor
+	"""
+	Gives a Gaussian with a mean of mean and a standard deviation of std_dev
+	"""
 	exp_numerator = -(w - mean)**2
 	exp_denominator = 2 * std_dev**2
 	G = np.exp(exp_numerator / exp_denominator)
@@ -214,6 +221,7 @@ def inv_frac_rms2_norm(amplitudes, dt, n_bins, mean_rate):
 	"""
 	inv_rms2 = amplitudes * dt * n_bins * mean_rate ** 2 / 2.0
 	return inv_rms2
+
 
 ################################################################################
 def inv_leahy_norm(amplitudes, dt, n_bins, mean_rate):
@@ -252,16 +260,16 @@ def make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate):
 	FT = inv_frac_rms2_norm(FT, dt, n_bins, noise_mean_rate)
 # 	FT = inv_leahy_norm(FT, dt, n_bins, noise_mean_rate)
 	
-	noise_unnorm_power = np.absolute(FT) ** 2
-	noise_unnorm_power[np.where(noise_unnorm_power < 0)] = 0
+# 	noise_unnorm_power = np.absolute(FT) ** 2
+# 	noise_unnorm_power[np.where(noise_unnorm_power < 0)] = 0
 
-	return noise_unnorm_power, FT
+	return FT
 ## End of function 'make_noise_seg'
 	
 	
 ################################################################################
 def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
-	qpo_scale, psd_file, ccf_file):
+	qpo_scale, fake_e_spec_file, psd_file, ccf_file):
 	"""
 			main
 			
@@ -295,7 +303,10 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 	std_dev = 4.71222233e-01
 	FWHM = 2 * np.sqrt(2 * np.log(2))*std_dev
 # 	print FWHM
-
+	
+	fake_e_spec = simlc.read_fakeit_spectra(fake_e_spec_file)
+	exposure = num_seg * num_seconds
+	
 	##########################################
 	## Making an array of Fourier frequencies
 	##########################################
@@ -319,25 +330,30 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 
 	for i in range(num_seg):
 	
-		noise_power, FT = make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins,\
+		rate_ci = np.zeros((n_bins, detchans))
+		FT = make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins,\
 			noise_mean_rate)
+		
 		noise_lc = fftpack.ifft(FT).real + noise_mean_rate
 		noise_lc[np.where(noise_lc < 0)] = 0.0
-		## Haven't figured out how to scale this -- dt? exposure? both? neither?
+
 		## Poisson stats are applied to counts, not count rate
-		noise_lc = np.random.poisson(noise_lc * dt) / dt  
+		for i in range(0, detchans):
+			rate_ci[:,i] = np.random.poisson(noise_lc * fake_e_spec[i] * dt / exposure) / dt  
+		rate_ref = np.random.poisson(noise_lc * np.mean(fake_e_spec[3:32]) * dt / exposure) / dt  
+# 		print np.shape(rate_ci)
+# 		exit()
 		
-		rate_ci = np.resize(np.repeat(noise_lc, detchans), (n_bins, detchans))
-		rate_ref = noise_lc
+		
 		cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
 			power_ref = xcf.make_cs(rate_ci, rate_ref, n_bins, detchans)
+		
 		## Sums across segments -- arrays, so it adds by index
-		sum_rate_whole_ci += np.mean(rate_ci)
-		sum_rate_whole_ref += np.mean(rate_ref)
+		sum_rate_whole_ci += mean_rate_segment_ci
+		sum_rate_whole_ref += mean_rate_segment_ref
 		sum_power_ci += power_ci
 		sum_power_ref += power_ref
 		cs_sum += cs_segment
-		
 		total_noise_lc = np.append(total_noise_lc, noise_lc)
 	## End of for-loop through the segments
 
@@ -386,19 +402,20 @@ if __name__=='__main__':
 lightcurve from a Timmer and Koenig simulated power spectrum.')
 	
 	parser.add_argument('n_bins', type=int, help="Number of bins per segment.")
-	parser.add_argument('dt', type=float, help="Time step between bins, in seconds.")
-	parser.add_argument('noise_mean_rate', type=float, help="Mean count rate of the light curve.")
-	parser.add_argument('num_seg', type=int, help="Number of segments to compute.")
-	parser.add_argument('variance', type=float, help="Variance of the frac rms2 power spectrum.")
-	parser.add_argument('pl_scale', type=float, help="Scale factor for power law component of the power spectrum.")
-	parser.add_argument('qpo_scale', type=float, help="Scale factor for qpo component of the power spectrum.")
+	parser.add_argument('dt', type=float, default=0.5, help="Time step between bins, in seconds. [0.5]")
+	parser.add_argument('noise_mean_rate', type=float, default=1000.0, help="Mean count rate of the light curve. [1000]")
+	parser.add_argument('num_seg', type=int, default=1.0, help="Number of segments to compute. [1.0]")
+	parser.add_argument('variance', type=float, default=1.0, help="Variance of the frac rms2 power spectrum.")
+	parser.add_argument('pl_scale', type=float, default=1e-4, help="Scale factor for power law component of the power spectrum. [1e-4]")
+	parser.add_argument('qpo_scale', type=float, default=1e-2, help="Scale factor for qpo component of the power spectrum. [1e-2]")
+	parser.add_argument('fake_e_spec', help="Name of fake energy spectrum.")
 	parser.add_argument('psd_file', help="Name of power spectrum output (fits) file.")
 	parser.add_argument('ccf_file', help="Name of CCF output (fits) file.")
 	
 	args = parser.parse_args()
 
 	main(args.n_bins, args.dt, args.noise_mean_rate, args.num_seg, \
-		args.variance, args.pl_scale, args.qpo_scale, args.psd_file, \
-		args.ccf_file)
+		args.variance, args.pl_scale, args.qpo_scale, args.fake_e_spec, \
+		args.psd_file, args.ccf_file)
 
 ################################################################################
