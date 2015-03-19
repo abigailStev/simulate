@@ -30,6 +30,15 @@ def lc_out(dt, lightcurve):
 	time_bins = np.arange(len(lightcurve))
 	time = time_bins * dt
 	
+
+	fig, ax = plt.subplots()
+	ax.plot(time_bins, lightcurve, lw=2)
+	ax.set_xlabel("Time bins")
+	ax.set_ylabel("Count rate")
+# 	plt.show()
+	plt.close()
+	
+	
 	out_data = np.column_stack((time, lightcurve))
 	np.savetxt('./TK_lightcurve.dat', out_data)
 	
@@ -219,7 +228,7 @@ def inv_frac_rms2_norm(amplitudes, dt, n_bins, mean_rate):
 	"""
 	rms2_power = 2.0 * power / dt / float(n_bins) / (mean_rate ** 2)
 	"""
-	inv_rms2 = amplitudes * dt * n_bins * mean_rate ** 2 / 2.0
+	inv_rms2 = amplitudes * n_bins * (mean_rate ** 2) / 2.0 / dt
 	return inv_rms2
 
 
@@ -233,7 +242,7 @@ def inv_leahy_norm(amplitudes, dt, n_bins, mean_rate):
 	
 	
 ################################################################################
-def make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate):
+def make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins):
 	"""
 			make_noise_seg
 	
@@ -257,7 +266,7 @@ def make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate):
 	FT_neg = FT_neg[::-1]
 
 	FT = np.append(FT_pos, FT_neg)
-	FT = inv_frac_rms2_norm(FT, dt, n_bins, noise_mean_rate)
+	
 # 	FT = inv_leahy_norm(FT, dt, n_bins, noise_mean_rate)
 	
 # 	noise_unnorm_power = np.absolute(FT) ** 2
@@ -268,8 +277,8 @@ def make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins, noise_mean_rate):
 	
 	
 ################################################################################
-def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
-	qpo_scale, fake_e_spec_file, psd_file, ccf_file):
+def main(n_bins, dt, num_seg, noise_psd_variance, exposure, \
+	pl_scale, qpo_scale, fake_e_spec_file, psd_file, ccf_file):
 	"""
 			main
 			
@@ -292,6 +301,7 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 	sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
 	sum_rate_whole_ref = 0
 	cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
+	mean_pow = np.zeros(n_bins)
 	
 # 	beta = -0.32240812  ## Slope of power law (include negative here if needed)
 # 	beta = -7.48026728e-01
@@ -303,9 +313,15 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 	std_dev = 4.71222233e-01
 	FWHM = 2 * np.sqrt(2 * np.log(2))*std_dev
 # 	print FWHM
+	noise_psd_rms = np.sqrt(noise_psd_variance)
+	
+	#######################################
+	## Reading in the fake energy spectrum
+	#######################################
 	
 	fake_e_spec = simlc.read_fakeit_spectra(fake_e_spec_file)
-	exposure = num_seg * num_seconds
+	noise_mean_rate = np.sum(fake_e_spec / exposure)
+	print "Noise_mean_rate:", noise_mean_rate
 	
 	##########################################
 	## Making an array of Fourier frequencies
@@ -317,12 +333,15 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 	## nyquist freq
 	neg_freq = frequencies[np.where(frequencies < 0)]
 	nyquist = np.max(np.abs(frequencies))
-
-# 	noise_psd_shape = noise_psd_scalefactor * lorentzian(pos_freq, w_1, gamma_1)
-# 	noise_psd_shape = noise_psd_scalefactor * (qpo_scale * lorentzian(pos_freq,\
-# 		w_1, gamma_1) + pl_scale * powerlaw(pos_freq, beta))
-	noise_psd_shape = noise_psd_scalefactor * (qpo_scale * gaussian(pos_freq,\
-		mean, std_dev) + pl_scale * powerlaw(pos_freq, beta))
+	
+	##################################################
+	## Defining the shape of the noise power spectrum
+	##################################################
+	
+	noise_psd_shape = noise_psd_variance * ((qpo_scale * gaussian(pos_freq,\
+		mean, std_dev)) + (pl_scale * powerlaw(pos_freq, beta)))
+	noise_psd_shape = inv_frac_rms2_norm(noise_psd_shape, dt, n_bins, noise_mean_rate)
+# 	noise_psd_shape = inv_leahy_norm(noise_psd_shape, dt, n_bins, noise_mean_rate)
 	
 	##########################################################################
 	## Making a new power spectrum from new random variables for each segment
@@ -331,22 +350,37 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 	for i in range(num_seg):
 	
 		rate_ci = np.zeros((n_bins, detchans))
-		FT = make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins,\
-			noise_mean_rate)
+		rate_ref = np.zeros((n_bins, detchans))
 		
-		noise_lc = fftpack.ifft(FT).real + noise_mean_rate
+		## Make Fourier transform using Timmer and Koenig method
+		FT = make_noise_seg(pos_freq, noise_psd_shape, dt, n_bins)
+		
+		## Get light curve from Fourier transform
+		noise_lc = fftpack.ifft(FT).real
 		noise_lc[np.where(noise_lc < 0)] = 0.0
-
+		
+		
 		## Poisson stats are applied to counts, not count rate
+		mean_lc = np.random.poisson((noise_lc + noise_mean_rate) * dt) / dt
+# 		mean_lc = noise_lc + noise_mean_rate
+		mean_rate_seg = np.mean(mean_lc)
+		mean_pow += np.abs(fftpack.fft(mean_lc - mean_rate_seg)) ** 2
+		
 		for i in range(0, detchans):
-			rate_ci[:,i] = np.random.poisson(noise_lc * fake_e_spec[i] * dt / exposure) / dt  
-		rate_ref = np.random.poisson(noise_lc * np.mean(fake_e_spec[3:32]) * dt / exposure) / dt  
-# 		print np.shape(rate_ci)
-# 		exit()
+			counts = (noise_lc + (fake_e_spec[i] / exposure)) * dt
+			rate_ci[:,i] = np.random.poisson(counts) / dt
+			rate_ref[:,i] = np.random.poisson(counts) / dt
+# 			rate_ci[:,i] = noise_lc + (fake_e_spec[i] / exposure)
+# 			rate_ref[:,i] = noise_lc + (fake_e_spec[i] / exposure)
 		
+		## Stack reference band
+		rate_ref = xcf.stack_reference_band(rate_ref, 0)
 		
+		## Compute cross spectrum
 		cs_segment, mean_rate_segment_ci, mean_rate_segment_ref, power_ci, \
 			power_ref = xcf.make_cs(rate_ci, rate_ref, n_bins, detchans)
+# 		print mean_rate_segment_ci[0:4]
+# 		print mean_rate_segment_ref
 		
 		## Sums across segments -- arrays, so it adds by index
 		sum_rate_whole_ci += mean_rate_segment_ci
@@ -354,24 +388,33 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 		sum_power_ci += power_ci
 		sum_power_ref += power_ref
 		cs_sum += cs_segment
-		total_noise_lc = np.append(total_noise_lc, noise_lc)
+		total_noise_lc = np.append(total_noise_lc, mean_lc)
 	## End of for-loop through the segments
-
+	
+	mean_pow /= float(num_seg)
 	mean_rate_whole_ci = sum_rate_whole_ci / float(num_seg)
 	mean_rate_whole_ref = sum_rate_whole_ref / float(num_seg)
 	mean_power_ci = sum_power_ci / float(num_seg)
 	mean_power_ref = sum_power_ref / float(num_seg)
 	cs_avg = cs_sum / float(num_seg)
+	
+	rms2_power = mean_pow * 2.0 * dt / float(n_bins) / (noise_mean_rate ** 2)  ## Fractional rms^2 normalization
+	rms2_power = rms2_power[0:len(pos_freq)]
+	print 2.0 / noise_mean_rate
+	rms2_power -= (2.0 / noise_mean_rate)
+# 	rms2_power /= noise_psd_variance   ## Divide by variance here?
+# 	leahy_power = mean_pow * 2.0 * dt / float(n_bins) / noise_mean_rate  ## Leahy normalization
+# 	print "Mean power:", np.mean(leahy_power), "(leahy)"
+	
+	total_variance = np.sum(rms2_power * df)
+	print "Total variance:", total_variance, "(frac rms)"
+	rms_total = np.sqrt(total_variance)
+	print "Total RMS:", rms_total, "(frac rms)"
 
-	power = sum_power_ref / float(num_seg)
-	power *= 2.0 * dt / float(n_bins) / (noise_mean_rate ** 2)  ## Fractional rms^2 normalization
-	power -= 2.0 / noise_mean_rate
-	power = power[0:len(pos_freq)]
-# 	power = 2.0 * power * dt / float(n_bins) / (noise_mean_rate)  ## Leahy normalization
 	
 	ccf_end, ccf_error = xcf.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
     	detchans, num_seconds, num_seg, mean_rate_whole_ci, \
-    	mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+    	mean_rate_whole_ref, mean_power_ci, mean_power_ref, False)
 	
 	t = np.arange(0, n_bins)
 
@@ -379,7 +422,7 @@ def main(n_bins, dt, noise_mean_rate, num_seg, noise_psd_scalefactor, pl_scale,\
 	## Output
 	##########
 	
-	power_out(psd_file, pos_freq, power, dt, n_bins, nyquist, num_seg, \
+	power_out(psd_file, pos_freq, rms2_power, dt, n_bins, nyquist, num_seg, \
 		noise_mean_rate)
 	
 	lc_out(dt, total_noise_lc)
@@ -403,9 +446,9 @@ lightcurve from a Timmer and Koenig simulated power spectrum.')
 	
 	parser.add_argument('n_bins', type=int, help="Number of bins per segment.")
 	parser.add_argument('dt', type=float, default=0.5, help="Time step between bins, in seconds. [0.5]")
-	parser.add_argument('noise_mean_rate', type=float, default=1000.0, help="Mean count rate of the light curve. [1000]")
 	parser.add_argument('num_seg', type=int, default=1.0, help="Number of segments to compute. [1.0]")
 	parser.add_argument('variance', type=float, default=1.0, help="Variance of the frac rms2 power spectrum.")
+	parser.add_argument('exposure', type=float, default=10000, help="Exposure time of the fake energy spectrum, in seconds. [10000]")
 	parser.add_argument('pl_scale', type=float, default=1e-4, help="Scale factor for power law component of the power spectrum. [1e-4]")
 	parser.add_argument('qpo_scale', type=float, default=1e-2, help="Scale factor for qpo component of the power spectrum. [1e-2]")
 	parser.add_argument('fake_e_spec', help="Name of fake energy spectrum.")
@@ -414,8 +457,8 @@ lightcurve from a Timmer and Koenig simulated power spectrum.')
 	
 	args = parser.parse_args()
 
-	main(args.n_bins, args.dt, args.noise_mean_rate, args.num_seg, \
-		args.variance, args.pl_scale, args.qpo_scale, args.fake_e_spec, \
-		args.psd_file, args.ccf_file)
+	main(args.n_bins, args.dt, args.num_seg, \
+		args.variance, args.exposure, args.pl_scale, args.qpo_scale, \
+		args.fake_e_spec, args.psd_file, args.ccf_file)
 
 ################################################################################
