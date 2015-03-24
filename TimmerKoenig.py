@@ -480,19 +480,40 @@ if __name__=='__main__':
 	############################################
 	## Parsing input arguments and calling main
 	############################################
+	
 	parser = argparse.ArgumentParser(description='This program makes a \
-lightcurve from a Timmer and Koenig simulated power spectrum.')
+lightcurve from a Timmer and Koenig simulated power spectrum.', epilogue='For \
+optional arguments, default values are given in square brackets at end of \
+description.')
 	
 	parser.add_argument('n_bins', type=int, help="Number of bins per segment.")
-	parser.add_argument('dt', type=float, default=0.5, help="Time step between bins, in seconds. [0.5]")
-	parser.add_argument('num_seg', type=int, default=1.0, help="Number of segments to compute. [1.0]")
-	parser.add_argument('num_sim', type=int, default=1.0, help="Number of simulations to run. [1.0]")
-	parser.add_argument('variance', type=float, default=1.0, help="Variance of the frac rms2 power spectrum.")
-	parser.add_argument('exposure', type=float, default=10000, help="Exposure time of the fake energy spectrum, in seconds. [10000]")
-	parser.add_argument('pl_scale', type=float, default=1e-4, help="Scale factor for power law component of the power spectrum. [1e-4]")
-	parser.add_argument('qpo_scale', type=float, default=1e-2, help="Scale factor for qpo component of the power spectrum. [1e-2]")
+	
+	parser.add_argument('dt', type=float, default=0.5, help="Time step between \
+bins, in seconds. [0.5]")
+
+	parser.add_argument('num_seg', type=int, default=1.0, help="Number of \
+segments to compute. [1.0]")
+
+	parser.add_argument('num_sim', type=int, default=1.0, help="Number of \
+simulations to run. [1.0]")
+
+	parser.add_argument('variance', type=float, default=1.0, help="Variance of \
+the frac rms2 power spectrum.")
+
+	parser.add_argument('exposure', type=float, default=10000, help="Exposure \
+time of the fake energy spectrum, in seconds. [10000]")
+
+	parser.add_argument('pl_scale', type=float, default=1e-4, help="Scale \
+factor for power law component of the power spectrum. [1e-4]")
+
+	parser.add_argument('qpo_scale', type=float, default=1e-2, help="Scale \
+factor for qpo component of the power spectrum. [1e-2]")
+
 	parser.add_argument('fake_e_spec', help="Name of fake energy spectrum.")
-	parser.add_argument('psd_file', help="Root name of power spectrum output (fits) file.")
+
+	parser.add_argument('psd_file', help="Root name of power spectrum output \
+(fits) file.")
+
 	parser.add_argument('ccf_file', help="Root name of CCF output (fits) file.")
 	
 	args = parser.parse_args()
