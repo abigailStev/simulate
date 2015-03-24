@@ -320,6 +320,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 	############################################################
 	
 	for i in range(num_sim):
+	
 		print " "
 		total_lc = np.asarray([])
 		cs_sum = np.zeros((n_bins, detchans))
@@ -363,10 +364,9 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 			#########################################################
 	
 			FT = make_FT_seg(pos_freq, psd_shape, dt, ks_lc_len, FT_seed[count_lc])
-# 			print len(FT)
+
 			## Get light curve from Fourier transform
 			light_curve = fftpack.ifft(FT).real
-# 			print "Len light curve:", len(light_curve)
 			
 			###########################################################
 			## Looping through the segments per simulation/realization
