@@ -32,21 +32,22 @@ def lc_out(dt, lightcurve):
 	time = time_bins * dt
 	
 
-	fig, ax = plt.subplots()
-	ax.plot(time_bins, lightcurve, lw=2)
-	ax.set_xlabel("Time bins")
-	ax.set_ylabel("Count rate")
-	ax.set_xlim(0,8192)
-# 	plt.show()
-	plt.close()
+# 	fig, ax = plt.subplots()
+# 	ax.plot(time_bins, lightcurve, lw=2)
+# 	ax.set_xlabel("Time bins")
+# 	ax.set_ylabel("Count rate")
+# 	ax.set_xlim(0,np.max(time_bins))
+# 	plt.savefig('./out_sim/TK_lightcurve.png', dpi=200)
+# # 	plt.show()
+# 	plt.close()
 	
 	
 	out_data = np.column_stack((time, lightcurve))
-	np.savetxt('./TK_lightcurve.dat', out_data)
+	np.savetxt('./out_sim/TK_lightcurve.dat', out_data)
 	
 	detchans=64
 	
-	out_file = "./TK_lightcurve.lc"
+	out_file = "./out_sim/TK_lightcurve.lc"
 	## Making header for standard power spectrum
 	prihdr = fits.Header()
 	prihdr.set('TYPE', "Fake light curve generated from T&K")
@@ -228,10 +229,10 @@ def gaussian(w, mean, std_dev):
 ################################################################################
 def inv_frac_rms2_norm(amplitudes, dt, n_bins, mean_rate):
 	"""
-	rms2_power = power * 2.0 * dt / float(n_bins) / (mean_rate ** 2)
+	fracrms_power = power * 2.0 * dt / float(n_bins) / (mean_rate ** 2)
 	"""
-	inv_rms2 = amplitudes * n_bins * (mean_rate ** 2) / 2.0 / dt
-	return inv_rms2
+	inv_fracrms = amplitudes * n_bins * (mean_rate ** 2) / 2.0 / dt
+	return inv_fracrms
 
 
 ################################################################################
@@ -251,8 +252,8 @@ def make_FT_seg(pos_freq, psd_shape, dt, n_bins, FT_seed):
 	Makes a Fourier segment of the defined shape.
 	
 	"""
-	np.random.seed(FT_seed)  ## to ensure that we get the same 'random' numbers 
-		## every realization; only want the poisson to change
+	np.random.seed(seed=FT_seed)  ## to ensure that we get the same 'random' 
+		## numbers every realization; only want the poisson to change
 	rand_r = np.random.standard_normal(len(pos_freq))
 	rand_i = np.random.standard_normal(len(pos_freq)-1)
 	rand_i = np.append(rand_i, 0.0)  ## because the nyquist frequency should 
@@ -291,16 +292,14 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 	detchans=64
 	num_seconds = dt * n_bins
 	ks_lc_len = int(2048.0 / dt)  ## Generating 2048 seconds of lc at a time
-	df = 1.0 / dt / float(ks_lc_len)
+	df_ks_lc = 1.0 / dt / float(ks_lc_len)
 	
-# 	beta = -0.32240812  ## Slope of power law (include negative here if needed)
-# 	beta = -7.48026728e-01
-	beta = -2.95778095e-01
+	beta = -1.0  ## Slope of power law (include negative here if needed)
 	## For QPOs, Q factor is w_0 / gamma
-	w_1 = 5.46710256  ## Centroid frequency of QPO
-	gamma_1 = 0.80653875  ## FWHM of QPO
-	mean = 5.45060810e+00
-	std_dev = 4.71222233e-01
+# 	w_1 = 5.46710256  ## Centroid frequency of QPO
+# 	gamma_1 = 0.80653875  ## FWHM of QPO
+	mean = 5.40940085493
+	std_dev = 0.473032436922
 	FWHM = 2 * np.sqrt(2 * np.log(2))*std_dev
 # 	print FWHM
 
@@ -344,7 +343,8 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 			## Making an array of Fourier frequencies
 			##########################################
 						
-			frequencies = np.arange(float(-ks_lc_len/2)+1, float(ks_lc_len/2)+1) * df
+			frequencies = np.arange(float(-ks_lc_len/2)+1, \
+				float(ks_lc_len/2)+1) * df_ks_lc
 			pos_freq = frequencies[np.where(frequencies >= 0)]  
 			## positive should have 2 more than negative, because of the 0 freq and the 
 			## nyquist freq
@@ -357,7 +357,8 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 	
 			psd_shape = psd_variance * ((qpo_scale * gaussian(pos_freq,\
 				mean, std_dev)) + (pl_scale * powerlaw(pos_freq, beta)))
-			psd_shape = inv_frac_rms2_norm(psd_shape, dt, ks_lc_len, mean_countrate)
+			psd_shape = inv_frac_rms2_norm(psd_shape, dt, ks_lc_len, \
+				mean_countrate)
 	
 			#########################################################
 			## Make Fourier transform using Timmer and Koenig method
@@ -379,7 +380,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 				
 				## Slicing this segment out of the larger 2048ks-long light curve
 				this_lc = light_curve[0:n_bins]
-				np.random.seed()
+				np.random.seed(seed=None)
 				## Poisson stats are applied to counts, not count rate
 				## Making a lightcurve to plot for checking
 				mean_lc = np.random.poisson((this_lc + mean_countrate) * dt) / dt
@@ -392,9 +393,11 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 					counts[np.where(counts < 0)] = 0.0
 					rate_ci[:,j] = np.random.poisson(counts) / dt
 					rate_ref[:,j] = np.random.poisson(counts) / dt
+				rate_ci[:,10] = 0.0
+				rate_ref[:,10] = 0.0
 		
 				## Stack reference band
-				rate_ref = xcf.stack_reference_band(rate_ref, 0)
+				rate_ref = xcf.stack_reference_band(rate_ref, 5)
 		
 				## Compute cross spectrum
 				cs_seg, mean_rate_seg_ci, mean_rate_seg_ref, power_ci, \
@@ -418,8 +421,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		## End of while loop through ks lightcurves
 		
 		mean_rate /= float(num_seg)
-		print "Mean count rate:", mean_rate
-# 		print mean_countrate
+# 		print "Mean count rate:", mean_rate
 		tot_freq = fftpack.fftfreq(n_bins, d=dt)
 		nyq_index = np.argmax(tot_freq) + 2  # +1 for nyquist, +1 for list cutoff 
 		tot_freq = np.abs(tot_freq[0:nyq_index])
@@ -431,16 +433,21 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		mean_power_ref = sum_power_ref / float(num_seg)
 		cs_avg = cs_sum / float(num_seg)
 		
+		df_seg  = 1.0 / float(num_seconds)
+		
 		## Fractional rms^2 normalization
-		rms2_power = mean_pow * 2.0 * dt / float(n_bins) / (mean_rate ** 2)  
-		rms2_power = rms2_power[0:nyq_index]
-		print "Poisson noise level:", 2.0 / mean_rate
-		rms2_power -= (2.0 / mean_rate)
+# 		fracrms_power = mean_pow * 2.0 * dt / float(n_bins) / (mean_rate ** 2)  
+# 		fracrms_power = fracrms_power[0:nyq_index]
+# 		fracrms_power -= (2.0 / mean_rate)
+		
+		fracrms_power = mean_power_ref * 2.0 * dt / float(n_bins) / (mean_rate_whole_ref ** 2)
+		fracrms_power = fracrms_power[0:nyq_index]
+		fracrms_power -= (2.0 / mean_rate_whole_ref)
 	
-		total_variance = np.sum(rms2_power * df)
-		print "Total variance:", total_variance, "(frac rms)"
+		total_variance = np.sum(fracrms_power * df_seg)
+		print "Variance of plotted:", total_variance, "(frac rms)"
 		rms_total = np.sqrt(total_variance)
-		print "Total RMS:", rms_total, "(frac rms)"
+		print "Rms of plotted: ", rms_total, "(frac rms)"
 		
 		###################################
 		## Computing the cross correlation
@@ -449,6 +456,9 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		ccf_end, ccf_error = xcf.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
 			detchans, num_seconds, num_seg, mean_rate_whole_ci, \
 			mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+		
+		print "Mean rate for all of ci:", np.sum(mean_rate_whole_ci)
+		print "Mean rate for ref:", mean_rate_whole_ref
 		
 		## Printing the first 100 ccf values to a table
 		sim_table_out(ccf_end)
@@ -460,7 +470,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		##########
 		
 		if i == 0:
-			power_out(psd_file, tot_freq, rms2_power, dt, n_bins, nyquist, num_seg,\
+			power_out(psd_file, tot_freq, fracrms_power, dt, n_bins, nyquist, num_seg,\
 				mean_countrate)
 	
 			lc_out(dt, total_lc)
@@ -482,7 +492,7 @@ if __name__=='__main__':
 	############################################
 	
 	parser = argparse.ArgumentParser(description='This program makes a \
-lightcurve from a Timmer and Koenig simulated power spectrum.', epilogue='For \
+lightcurve from a Timmer and Koenig simulated power spectrum.', epilog='For \
 optional arguments, default values are given in square brackets at end of \
 description.')
 	
