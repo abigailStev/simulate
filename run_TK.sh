@@ -12,18 +12,17 @@ prefix="FAKE-TK-GX339B"
 nbins=8192
 dt=0.0078125
 rebin_const=1.01
+# numsegments=267
 numsegments=267
-# numsegments=10
 numsimulations=1
 # numsimulations=1000
 exposure=17450.0
-variance=0.00731682828543  ##in frac rms units
-pl_scale=0.01  ## relative scale factor
-qpo_scale=1    ## relative scale factor
-# pl_scale=0.00033744
-# qpo_scale=0.02769814
-fake_e_spec="$sim_dir/spectra/${prefix}.fak"
+# variance=0.00731682828543  ##in frac rms units
+variance=0.011035109168
+qpo_scale=0.00381033206691
+pl_scale=0.000329640418634
 
+fake_e_spec="$sim_dir/spectra/${prefix}.fak"
 
 cd "$sim_dir"
 
@@ -35,8 +34,11 @@ pow_rb_plot="$out_dir/TK_psd_rb.png"
 ccf_plot="$out_dir/TK_ccf"
 ccf_2D_plot="$out_dir/TK_ccf_2D.png"
 
-python "$sim_dir"/TimmerKoenig.py "$nbins" "$dt" "$numsegments" "$numsimulations" "$variance" \
-	"$exposure" "$pl_scale" "$qpo_scale" "$fake_e_spec" "$pow_out" "$ccf_out"
+python "$sim_dir"/TimmerKoenig.py "$nbins" "$dt" "$numsegments" \
+	"$numsimulations" "$variance" "$exposure" "$pl_scale" "$qpo_scale" \
+	"$fake_e_spec" "$pow_out" "$ccf_out"
+	
+# open "$out_dir"/TK_lightcurve.png
 
 python "$pow_dir"/plot_powerspec.py "$pow_out" -o "$pow_plot" -p "$prefix"
 # if [ -e "$pow_plot" ]; then open "$pow_plot"; fi
