@@ -187,7 +187,7 @@ def sim_table_out(ccf):
 	"""
 	out_file="./TK_simulation_table.dat"
 	with open(out_file, 'a') as out:
-		for element in ccf[0:100,15]:
+		for element in ccf[0:100,6]:
 			out.write("%.6e\t" % element.real)
 		out.write("\n")
 ## End of function 'sim_table_out'
@@ -200,7 +200,7 @@ def powerlaw(w, beta):
     """
 	pl = np.zeros(len(w))
 	pl[1:] = w[1:] ** (beta)
-	pl[0] = np.inf
+	pl[0] = 0
 	return pl
 
 
@@ -227,11 +227,16 @@ def gaussian(w, mean, std_dev):
 	
 	
 ################################################################################
-def inv_frac_rms2_norm(amplitudes, dt, n_bins, mean_rate):
+def inv_frac_rms2_norm(amplitudes, dt, n_bins):
 	"""
 	fracrms_power = power * 2.0 * dt / float(n_bins) / (mean_rate ** 2)
+	if i don't put mean rate in here, it's like the mean is 1, so then i could
+	multiply by whatever mean i want at the end
 	"""
-	inv_fracrms = amplitudes * n_bins * (mean_rate ** 2) / 2.0 / dt
+	
+	inv_fracrms = np.zeros(len(amplitudes))
+	inv_fracrms[1:] = amplitudes[1:] * n_bins  / 2.0 / dt
+	inv_fracrms[0] = 0
 	return inv_fracrms
 
 
@@ -257,14 +262,14 @@ def make_FT_seg(pos_freq, psd_shape, dt, n_bins, FT_seed):
 	rand_r = np.random.standard_normal(len(pos_freq))
 	rand_i = np.random.standard_normal(len(pos_freq)-1)
 	rand_i = np.append(rand_i, 0.0)  ## because the nyquist frequency should 
-									 ## only have a real value
+		## only have a real value
 
 	## Creating the real and imaginary values from the lists of random numbers
 	r_values = rand_r * np.sqrt(0.5 * psd_shape)
 	i_values = rand_i * np.sqrt(0.5 * psd_shape)
 
-	r_values[np.where(pos_freq == 0)] = 0
-	i_values[np.where(pos_freq == 0)] = 0
+	r_values[0] = 0
+	i_values[0] = 0
 	
 	## Putting them together to make the Fourier transform
 	FT_pos = r_values + i_values*1j
@@ -291,7 +296,8 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 	
 	detchans=64
 	num_seconds = dt * n_bins
-	ks_lc_len = int(2048.0 / dt)  ## Generating 2048 seconds of lc at a time
+# 	ks_lc_len = int(2048.0 / dt)  ## Generating 2048 seconds of lc at a time
+	ks_lc_len = n_bins
 	df_ks_lc = 1.0 / dt / float(ks_lc_len)
 	
 	beta = -1.0  ## Slope of power law (include negative here if needed)
@@ -311,8 +317,16 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 	#######################################
 	
 	fake_e_spec = simlc.read_fakeit_spectra(fake_e_spec_file)
-	mean_countrate = np.sum(fake_e_spec / exposure)
-	print "Mean countrate in channel 15:", fake_e_spec[15]/exposure
+	mean_countrate = np.sum(fake_e_spec) / exposure
+	print "Mean countrate in channel 6:", fake_e_spec[6]/exposure
+	ci_countrate = fake_e_spec / exposure
+	ref_countrate = np.sum(fake_e_spec[2:26])/exposure
+	
+	countrate_ratio = 1170.0 / ref_countrate
+	ci_countrate *= countrate_ratio
+	ref_countrate *= countrate_ratio
+# 	print "CI countrate:", ci_countrate
+# 	print "Ref band countrate:", ref_countrate
 	
 	############################################################
 	## Looping through the independent realizations/simulations
@@ -346,26 +360,43 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 			frequencies = np.arange(float(-ks_lc_len/2)+1, \
 				float(ks_lc_len/2)+1) * df_ks_lc
 			pos_freq = frequencies[np.where(frequencies >= 0)]  
-			## positive should have 2 more than negative, because of the 0 freq and the 
-			## nyquist freq
+			## positive should have 2 more than negative, because of the 0 freq
+			## and the nyquist freq
 			neg_freq = frequencies[np.where(frequencies < 0)]
 			nyquist = np.max(np.abs(frequencies))
-	
+			
 			##################################################
 			## Defining the shape of the noise power spectrum
-			##################################################
-	
-			psd_shape = psd_variance * ((qpo_scale * gaussian(pos_freq,\
-				mean, std_dev)) + (pl_scale * powerlaw(pos_freq, beta)))
-			psd_shape = inv_frac_rms2_norm(psd_shape, dt, ks_lc_len, \
-				mean_countrate)
-	
+			##################################################		
+						
+			psd_shape = ((qpo_scale * gaussian(pos_freq,\
+				mean, std_dev)) + (pl_scale * powerlaw(pos_freq, beta)))  ## this has power density units; 
+			
+			psd_shape_var = np.sum(psd_shape * df_ks_lc)
+			
+# 			print "Input PSD var:", psd_variance,"(frac rms)"
+# 			print "PSD shape var:", psd_shape_var
+# 			print psd_variance / psd_shape_var
+			psd_shape *= (psd_variance / psd_shape_var)
+			
+			psd_shape = inv_frac_rms2_norm(psd_shape, dt, n_bins)
+			
 			#########################################################
 			## Make Fourier transform using Timmer and Koenig method
 			#########################################################
-	
-			FT = make_FT_seg(pos_freq, psd_shape, dt, ks_lc_len, FT_seed[count_lc])
-
+			
+			FT = make_FT_seg(pos_freq, psd_shape, dt, ks_lc_len, \
+				FT_seed[count_lc])
+				
+			temp_pow = np.abs(FT) ** 2
+			mean_pow += temp_pow
+# 			fracrms_power = temp_pow * 2.0 * dt / float(n_bins)
+# 			fracrms_power = fracrms_power[0:len(pos_freq)]  ## don't subtract noise b/c no poisson noise to subtract!		
+# 			fracrms_var = np.sum(fracrms_power * df_ks_lc)
+# 			fracrms_rms = np.sqrt(fracrms_var)
+# 			print "Var of orig FT:", fracrms_var, "(frac rms)"
+# 			print "RMS of orig FT:", fracrms_rms, "(frac rms)"
+						
 			## Get light curve from Fourier transform
 			light_curve = fftpack.ifft(FT).real
 			
@@ -381,28 +412,22 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 				## Slicing this segment out of the larger 2048ks-long light curve
 				this_lc = light_curve[0:n_bins]
 				np.random.seed(seed=None)
+				
 				## Poisson stats are applied to counts, not count rate
 				## Making a lightcurve to plot for checking
-				mean_lc = np.random.poisson((this_lc + mean_countrate) * dt) / dt
-				mean_rate_seg = np.mean(mean_lc)
-				mean_pow += np.abs(fftpack.fft(mean_lc - mean_rate_seg)) ** 2
 				
 				## Adding Poisson noise to the interest and reference light curves
 				for j in range(0, detchans):
-					counts = (this_lc + (fake_e_spec[j] / exposure)) * dt
+					counts = (this_lc + ci_countrate[j]) * dt
 					counts[np.where(counts < 0)] = 0.0
 					rate_ci[:,j] = np.random.poisson(counts) / dt
-					rate_ref[:,j] = np.random.poisson(counts) / dt
-				rate_ci[:,10] = 0.0
-				rate_ref[:,10] = 0.0
-		
-				## Stack reference band
-				rate_ref = xcf.stack_reference_band(rate_ref, 5)
-		
+				
+				rate_ref = np.random.poisson((this_lc + ref_countrate) * dt) / dt
+				
 				## Compute cross spectrum
 				cs_seg, mean_rate_seg_ci, mean_rate_seg_ref, power_ci, \
 					power_ref = xcf.make_cs(rate_ci, rate_ref, n_bins, detchans)
-			
+
 				count_numseg += 1
 				light_curve = light_curve[n_bins:]
 				
@@ -412,19 +437,20 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 				sum_power_ci += power_ci
 				sum_power_ref += power_ref
 				cs_sum += cs_seg
-				total_lc = np.append(total_lc, mean_lc)
-				mean_rate += mean_rate_seg
+# 				total_lc = np.append(total_lc, mean_lc)
+# 				mean_rate += mean_rate_seg
 
 			## End of for-loop through the segments
 			count_lc += 1
 			
 		## End of while loop through ks lightcurves
 		
-		mean_rate /= float(num_seg)
+# 		mean_rate /= float(num_seg)
 # 		print "Mean count rate:", mean_rate
 		tot_freq = fftpack.fftfreq(n_bins, d=dt)
 		nyq_index = np.argmax(tot_freq) + 2  # +1 for nyquist, +1 for list cutoff 
 		tot_freq = np.abs(tot_freq[0:nyq_index])
+		nyq_seg = np.max(tot_freq)
 		mean_pow /= float(num_seg)
 		
 		mean_rate_whole_ci = sum_rate_whole_ci / float(num_seg)
@@ -434,18 +460,17 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		cs_avg = cs_sum / float(num_seg)
 		
 		df_seg  = 1.0 / float(num_seconds)
-		
 		## Fractional rms^2 normalization
-# 		fracrms_power = mean_pow * 2.0 * dt / float(n_bins) / (mean_rate ** 2)  
+# 		fracrms_power = mean_pow * 2.0 * dt / float(n_bins) / (ref_countrate ** 2)  
 # 		fracrms_power = fracrms_power[0:nyq_index]
-# 		fracrms_power -= (2.0 / mean_rate)
 		
 		fracrms_power = mean_power_ref * 2.0 * dt / float(n_bins) / (mean_rate_whole_ref ** 2)
 		fracrms_power = fracrms_power[0:nyq_index]
 		fracrms_power -= (2.0 / mean_rate_whole_ref)
-	
+		
 		total_variance = np.sum(fracrms_power * df_seg)
-		print "Variance of plotted:", total_variance, "(frac rms)"
+		print "\nVariance of plotted:", total_variance, "(frac rms)"
+		print "Variance of plotted:", total_variance * (ref_countrate ** 2), "(abs rms)"
 		rms_total = np.sqrt(total_variance)
 		print "Rms of plotted: ", rms_total, "(frac rms)"
 		
@@ -470,10 +495,10 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		##########
 		
 		if i == 0:
-			power_out(psd_file, tot_freq, fracrms_power, dt, n_bins, nyquist, num_seg,\
-				mean_countrate)
+			power_out(psd_file, tot_freq, fracrms_power, dt, n_bins, nyq_seg, num_seg,\
+				mean_rate_whole_ref)
 	
-			lc_out(dt, total_lc)
+# 			lc_out(dt, total_lc)
 	
 			ccf_out(ccf_file, dt, n_bins, detchans, num_seg, mean_rate_whole_ci, \
 				mean_rate_whole_ref, t, ccf_end, ccf_error)	
