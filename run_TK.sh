@@ -7,22 +7,23 @@ ccf_dir="$home_dir/Dropbox/Research/cross_correlation"
 out_dir="$sim_dir/out_sim"
 
 prefix="FAKE-TK-GX339B"
-# day=$(date +%y%m%d)  # make the date a string and assign it to 'day'
+# day=$(date +%y%m%d)
 
 nbins=8192
 dt=0.0078125
 rebin_const=1.01
 # numsegments=267
-numsegments=267
+numsegments=10
 numsimulations=1
 # numsimulations=1000
 exposure=17450.0
-# variance=0.00731682828543  ##in frac rms units
-variance=0.011035109168
+# variance=0.00731682828543  ## in frac rms^2 units
+# variance=0.011035109168  ## in frac rms^2 units
+variance=15150.6069116  ## in abs rms^2 units
 qpo_scale=0.00381033206691
 pl_scale=0.000329640418634
 
-fake_e_spec="$sim_dir/spectra/${prefix}.fak"
+fake_e_spec="$sim_dir/spectra/${prefix}_all_evt.fak"
 
 cd "$sim_dir"
 
@@ -41,7 +42,7 @@ python "$sim_dir"/TimmerKoenig.py "$nbins" "$dt" "$numsegments" \
 # open "$out_dir"/TK_lightcurve.png
 
 python "$pow_dir"/plot_powerspec.py "$pow_out" -o "$pow_plot" -p "$prefix"
-# if [ -e "$pow_plot" ]; then open "$pow_plot"; fi
+if [ -e "$pow_plot" ]; then open "$pow_plot"; fi
 
 python "$pow_dir"/rebin_powerspec.py "$pow_out" "$pow_rb_out" -o "$pow_rb_plot"\
 	-p "$prefix" -c "$rebin_const"
@@ -51,5 +52,5 @@ if [ -e "$ccf_out" ]; then
 	python "$ccf_dir"/plot_ccf.py "$ccf_out" -o "$ccf_plot" -p "$prefix" 
 # 	if [ -e "$ccf_plot"_chan_06.png ]; then open "$ccf_plot"_chan_06.png; fi
 	python "$ccf_dir"/plot_2d.py "$ccf_out" -o "$ccf_2D_plot" -p "${prefix}"
-# 	if [ -e "$ccf_2D_plot" ]; then open "$ccf_2D_plot"; fi
+	if [ -e "$ccf_2D_plot" ]; then open "$ccf_2D_plot"; fi
 fi
