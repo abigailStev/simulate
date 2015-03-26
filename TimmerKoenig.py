@@ -296,8 +296,8 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 	
 	detchans=64
 	num_seconds = dt * n_bins
-# 	ks_lc_len = int(2048.0 / dt)  ## Generating 2048 seconds of lc at a time
-	ks_lc_len = n_bins
+	ks_lc_len = int(2048.0 / dt)  ## Generating 2048 seconds of lc at a time
+# 	ks_lc_len = n_bins
 	df_ks_lc = 1.0 / dt / float(ks_lc_len)
 	
 	beta = -1.0  ## Slope of power law (include negative here if needed)
@@ -342,7 +342,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
 		sum_rate_whole_ref = 0
 		cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
-		mean_pow = np.zeros(n_bins)
+		mean_pow = np.zeros(ks_lc_len)
 		count_numseg = 0
 		count_lc = 0
 		mean_rate = 0
@@ -379,7 +379,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 # 			print psd_variance / psd_shape_var
 			psd_shape *= (psd_variance / psd_shape_var)
 			
-			psd_shape = inv_frac_rms2_norm(psd_shape, dt, n_bins)
+			psd_shape = inv_frac_rms2_norm(psd_shape, dt, ks_lc_len)
 			
 			#########################################################
 			## Make Fourier transform using Timmer and Koenig method
@@ -446,7 +446,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		## End of while loop through ks lightcurves
 		
 # 		mean_rate /= float(num_seg)
-# 		print "Mean count rate:", mean_rate
+		print "Mean count rate:", mean_rate
 		tot_freq = fftpack.fftfreq(n_bins, d=dt)
 		nyq_index = np.argmax(tot_freq) + 2  # +1 for nyquist, +1 for list cutoff 
 		tot_freq = np.abs(tot_freq[0:nyq_index])
@@ -460,6 +460,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		cs_avg = cs_sum / float(num_seg)
 		
 		df_seg  = 1.0 / float(num_seconds)
+		
 		## Fractional rms^2 normalization
 # 		fracrms_power = mean_pow * 2.0 * dt / float(n_bins) / (ref_countrate ** 2)  
 # 		fracrms_power = fracrms_power[0:nyq_index]
