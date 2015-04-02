@@ -35,7 +35,9 @@ ccfs_plot="$out_dir/${out_root}_manyccfs.png"
 
 # python "$exe_dir"/simulate_lightcurves.py -h
 
-# time python "$exe_dir"/simulate_lightcurves.py --freq "$freq" --bb "$bb_spec" --pl "$pl_spec" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --exposure "$exposure" --phase "$phase" #--test
+# time python "$exe_dir"/simulate_lightcurves.py --freq "$freq" --bb "$bb_spec"\
+# 	--pl "$pl_spec" --amp_ci "$amp_ci" --amp_ref "$amp_ref" \
+# 	--num_seconds "$numsec" --exposure "$exposure" --phase "$phase" #--test
 # 
 # if [ -e "$exe_dir/plot.png" ]; then
 # 	open -a ImageJ "$exe_dir/plot.png"
@@ -49,13 +51,19 @@ ccfs_plot="$out_dir/${out_root}_manyccfs.png"
 ## Running ccf_simulation
 ###########################
 
-time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" --pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" --num_seconds "$numsec" --phase "$phase" --test # --noisy 
+time python "$exe_dir/"ccf_simulation.py "$ccf_file" --bb "$bb_spec" \
+	--pl "$pl_spec" --freq "$freq" --amp_ci "$amp_ci" --amp_ref "$amp_ref" \
+	--num_seconds "$numsec" --phase "$phase" #--test # --noisy 
 
 if [ -e "$ccf_file" ]; then
 	python "$ccf_dir/"plot_ccf.py "$ccf_file" -o "$plot_root" -p "FAKE"
-	open -a ImageJ "${plot_root}_chan_06.png"
+# 	if [ -e "${plot_root}_chan_06.png" ]; then
+# 		open -a ImageJ "${plot_root}_chan_06.png"
+# 	fi
 	python "$ccf_dir"/plot_multi.py "$ccf_file" "$ccfs_plot" "${numsec}"
-	open -a ImageJ "$ccfs_plot"
+# 	if [ -e "$ccfs_plot" ]; then
+# 		open -a ImageJ "$ccfs_plot"
+# 	fi
 fi
 
 ## If heainit isn't running, start it
@@ -169,7 +177,7 @@ if [ -e "$spectrum_plot.eps" ]; then
 	awk '/%%EndComments/{print "%% phase = "'$phase'" degrees, of PL wrt BB"}1' $spectrum_plot.eps > temp.eps
 	mv -f temp.eps "$spectrum_plot.eps"
 # 	open -a "TextWrangler" "$spectrum_plot.eps"
-	open "$spectrum_plot.eps"
+# 	open "$spectrum_plot.eps"
 	echo "Spectrum: $spectrum_plot.eps"
 fi
 
@@ -247,6 +255,6 @@ if [ -e "$spectrum_plot.eps" ]; then
 	awk '/%%EndComments/{print "%% phase = "'$phase'" degrees, of PL wrt BB"}1' $spectrum_plot.eps > temp.eps
 	mv -f temp.eps "$spectrum_plot.eps"
 # 	open -a "TextWrangler" "$spectrum_plot.eps"
-	open "$spectrum_plot.eps"
+# 	open "$spectrum_plot.eps"
 	echo "Spectrum: $spectrum_plot.eps"
 fi
