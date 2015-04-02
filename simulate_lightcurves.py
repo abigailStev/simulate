@@ -3,24 +3,25 @@ import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
 from astropy.io import fits
-import tools
-from ccf import stack_reference_band
-import powerspec
 from scipy import fftpack
+import tools  # https://github.com/abigailStev/whizzy_scripts
+from ccf import stack_reference_band
+import powerspec  # https://github.com/abigailStev/power_spectra
+
+__author__ = "Abigail Stevens"
+__author_email__ = "A.L.Stevens at uva.nl"
+__year__ = "2014-2015"
+__description__ = "Simulates two light curves from fake spectra and computes \
+their cross-correlation function."
 
 """
 		simulate_lightcurves
 
-Written in Python 2.7 by A.L. Stevens, A.L.Stevens@uva.nl, 2014
-
-All scientific modules imported above, as well as Python 2.7, can be downloaded 
-in the Anaconda package, https://store.continuum.io/cshop/anaconda/
-
-'tools' can be found in the github repo 'whizzy_scripts'
-'stack_reference_band' can be found in the github repo 'cross_correlation'
+Written in Python 2.7.
 
 """
-###############################################################################
+
+################################################################################
 def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 	"""
 			plot_curves
@@ -42,8 +43,8 @@ def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 	ax.plot(bins, curve_ci, linewidth=1.5, label="Curve 'ci'")
 	ax.plot(bins, curve_ref, linewidth=1.5, label="Curve 'ref'")
 	plt.xlim(0, 30)
-	plt.xlabel('Arbitrary time bins')
-	plt.ylabel('Count rate')
+	plt.xlabel('Integer time bins')
+	plt.ylabel('Photon count rate')
 
 	## The following legend code was found on stack overflow I think, 
 	## or a pyplot tutorial
@@ -63,7 +64,7 @@ def plot_curves(n_bins, curve_ci, curve_ref, plot_file):
 ## End function 'plot_curves'
 	
 	
-###############################################################################
+################################################################################
 def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
 	mean_rate_ref, noisy):
 	"""
@@ -80,36 +81,31 @@ def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
 	fig, ax = plt.subplots()
 	ax.plot(ps_freq, rms2_power, linewidth=2)
 # 	ax.plot(ps_freq, leahy_power-2, linewidth=2)
-	plt.xlabel(r'$\nu$ [Hz]')
-	plt.ylabel(r'Noise-subtracted fractional rms$^2$ power')
-	plt.xlim(0,800)
-	plt.ylim(0,)
-	# plt.xscale('symlog') # this works much better than 'log'
-	# plt.yscale('symlog')
-	plt.title("Power spectrum")
+	ax.set_xlabel(r'$\nu$ [Hz]')
+	ax.set_ylabel(r'Noise-subtracted fractional rms$^2$ power')
+	ax.set_xlim(0,800)
+	ax.set_ylim(0,)
+	ax.set_title("Power spectrum")
 	plt.savefig("sim_power.png", dpi=120)
 # 	plt.show()
 	plt.close()
 ## End of function 'power_spectra_things'
 	
 	
-###############################################################################
+################################################################################
 def determine_extra_bins(bpp):
 	"""
 	
 	"""
-	
 	i = 1
 	while np.abs(bpp*i - np.rint(bpp*i)) > 0.1 and \
 		np.abs(bpp*i - np.rint(bpp*i)) < 0.9 and i < 100:
 		i+= 1
-	
-	print np.rint(bpp*i)
 	return np.rint(bpp*i)
 ## End of function 'determine_extra_bins'
 	
 
-###############################################################################
+################################################################################
 def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 	phase):
 	"""
@@ -136,6 +132,7 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 	
 	Returns: sine_ci - Relative sine wave signal for ci of length n_bins.
 			 sine_ref - Relative sine wave signal for ref of length n_bins.
+			 extra_bins - 
 			 
 	"""
 	
@@ -160,11 +157,7 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 
 	smooth_sine_ci = amp_ci * np.sin(2.0 * np.pi * tiny_bins / bins_per_period + phase) + mean_ci
 	smooth_sine_ref = amp_ref * np.sin(2.0 * np.pi * tiny_bins / bins_per_period + phase) + mean_ref
-	
-	
-	
-	
-	
+
 	sine_ci = np.mean(np.array_split(smooth_sine_ci, n_bins+extra_bins), axis=1)
 	sine_ref = np.mean(np.array_split(smooth_sine_ref, n_bins+extra_bins), axis=1)
 	
@@ -176,7 +169,7 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 ## End of function 'generate_sines'
 
 
-###############################################################################
+################################################################################
 def read_fakeit_spectra(spec_file):
 	"""
 			read_fakeit_spectra
@@ -189,7 +182,6 @@ def read_fakeit_spectra(spec_file):
 	
 	"""
 	
-# 	print spec_file[-3:]
 	print "Energy spectrum file: %s" % spec_file
 	if spec_file[-3:] == "dat":
 		table = np.loadtxt(spec_file, dtype=float)
@@ -199,17 +191,14 @@ def read_fakeit_spectra(spec_file):
 		file_hdu = fits.open(spec_file)
 		spectrum = file_hdu[1].data.field('COUNTS')
 	else:
-		raise Exception("ERROR: Spectrum format not recognized. Must be a fits file of type '.fak' or a text file of type '.dat'.")
-		
-	assert len(spectrum) == 64
-# 	print np.shape(spectrum)
-# 	print spectrum
+		raise Exception("ERROR: Spectrum format not recognized. Must be a fits \
+file of type '.fak' or a text file of type '.dat'.")
 
 	return spectrum
 ## End of function 'read_fakeit_spectra'
 
 
-###############################################################################
+################################################################################
 def make_lightcurves(spec_xx, sine_ci, sine_ref, n_bins):
 	"""
 			make_lightcurves
@@ -242,7 +231,7 @@ def make_lightcurves(spec_xx, sine_ci, sine_ref, n_bins):
 ## End of function 'make_lightcurves'
 
 
-###############################################################################
+################################################################################
 def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 	exposure, noisy):
 	"""
@@ -281,8 +270,12 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 ## End of function 'add_lightcurves'
 
 
-###############################################################################
+################################################################################
 if __name__ == "__main__":
+
+	###########################
+	## Parsing input arguments
+	###########################
 	
 	parser = argparse.ArgumentParser(description='Simulates the light curve of \
 		a periodic pulsation with the blackbody component varying out of phase \
@@ -379,4 +372,4 @@ if __name__ == "__main__":
 	
 ## End of main function
 
-## End of 'simulate_lightcurves.py'
+################################################################################
