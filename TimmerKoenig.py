@@ -30,49 +30,38 @@ def lc_out(dt, lightcurve):
 	"""
 	time_bins = np.arange(len(lightcurve))
 	time = time_bins * dt
-	
 
-# 	fig, ax = plt.subplots()
-# 	ax.plot(time_bins, lightcurve, lw=2)
-# 	ax.set_xlabel("Time bins")
-# 	ax.set_ylabel("Count rate")
-# 	ax.set_xlim(0,np.max(time_bins))
-# 	plt.savefig('./out_sim/TK_lightcurve.png', dpi=200)
-# # 	plt.show()
-# 	plt.close()
+	out_data = np.column_stack((time_bins, lightcurve))
+	np.savetxt('./out_sim/TK_lightcurve_wpoiss.dat', out_data)
 	
-	
-	out_data = np.column_stack((time, lightcurve))
-	np.savetxt('./out_sim/TK_lightcurve.dat', out_data)
-	
-	detchans=64
-	
-	out_file = "./out_sim/TK_lightcurve.lc"
-	## Making header for standard power spectrum
-	prihdr = fits.Header()
-	prihdr.set('TYPE', "Fake light curve generated from T&K")
-	prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
-	prihdr.set('TIMEDEL', 0.0001220703125)
-	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
-	prihdu = fits.PrimaryHDU(header=prihdr)
-	
-	## Making FITS table for standard power spectrum
-	col1 = fits.Column(name='TIME', unit='s', format='1D', array=time)
-	col2 = fits.Column(name='RATE', unit='photon/s', format='1D', \
-		array=lightcurve)
-	cols = fits.ColDefs([col1, col2])
-	tbhdu = fits.BinTableHDU.from_columns(cols)
-	
-	## If the file already exists, remove it (still working on just updating it)
-# 	assert out_file[-4:].lower() == "fits", \
-# 		'ERROR: Standard output file must have extension ".fits".'
-	if os.path.isfile(out_file):
-# 		print "File previously existed. Removing and rewriting."
-		os.remove(out_file)
-		
-	## Writing the standard power spectrum to a FITS file
-	thdulist = fits.HDUList([prihdu, tbhdu])
-	thdulist.writeto(out_file)	
+# 	detchans=64
+# 	
+# 	out_file = "./out_sim/TK_lightcurve.lc"
+# 	## Making FITS header
+# 	prihdr = fits.Header()
+# 	prihdr.set('TYPE', "Fake light curve generated from T&K")
+# 	prihdr.set('DATE', str(datetime.now()), "YYYY-MM-DD localtime")
+# 	prihdr.set('TIMEDEL', 0.0001220703125)
+# 	prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
+# 	prihdu = fits.PrimaryHDU(header=prihdr)
+# 	
+# 	## Making FITS table
+# 	col1 = fits.Column(name='TIME', unit='s', format='1D', array=time)
+# 	col2 = fits.Column(name='RATE', unit='photon/s', format='1D', \
+# 		array=lightcurve)
+# 	cols = fits.ColDefs([col1, col2])
+# 	tbhdu = fits.BinTableHDU.from_columns(cols)
+# 	
+# 	## If the file already exists, remove it (still working on just updating it)
+# # 	assert out_file[-4:].lower() == "fits", \
+# # 		'ERROR: Standard output file must have extension ".fits".'
+# 	if os.path.isfile(out_file):
+# # 		print "File previously existed. Removing and rewriting."
+# 		os.remove(out_file)
+# 		
+# 	## Writing the standard power spectrum to a FITS file
+# 	thdulist = fits.HDUList([prihdu, tbhdu])
+# 	thdulist.writeto(out_file)	
 ## End of function 'lc_out'
 
 
@@ -118,8 +107,8 @@ def power_out(out_file, freq, power, dt, n_bins, nyquist, num_seg, mean_rate):
 
 
 ################################################################################
-def ccf_out(out_file, dt, n_bins, detchans, num_segments, mean_rate_whole_ci, \
-	mean_rate_whole_ref, t, ccf, ccf_error):
+def ccf_out(out_file, dt, n_bins, detchans, num_segments, mean_rate_ci_whole, \
+	mean_rate_ref_whole, t, ccf, ccf_error):
     """
             ccf_out
 
@@ -149,8 +138,8 @@ def ccf_out(out_file, dt, n_bins, detchans, num_segments, mean_rate_whole_ci, \
     prihdr.set('EXPOSURE', num_segments * num_seconds, \
     	"seconds, of light curve")
     prihdr.set('DETCHANS', detchans, "Number of detector energy channels")
-    prihdr.set('RATE_CI', str(mean_rate_whole_ci.tolist()), "counts/second")
-    prihdr.set('RATE_REF', mean_rate_whole_ref, "counts/second")
+    prihdr.set('RATE_CI', str(mean_rate_ci_whole.tolist()), "counts/second")
+    prihdr.set('RATE_REF', mean_rate_ref_whole, "counts/second")
     prihdr.set('FILTER', 'False')
     prihdu = fits.PrimaryHDU(header=prihdr)
     
@@ -318,16 +307,15 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 	
 	fake_e_spec = simlc.read_fakeit_spectra(fake_e_spec_file)
 	mean_countrate = np.sum(fake_e_spec) / exposure
-	print "Mean countrate in channel 6:", fake_e_spec[6]/exposure
 	ci_countrate = fake_e_spec / exposure
-	ref_countrate = np.sum(fake_e_spec[2:26])/exposure
-	
-	countrate_ratio = 1170.0 / ref_countrate
-	ci_countrate *= countrate_ratio
-	ref_countrate *= countrate_ratio
+# 	ref_countrate = np.sum(fake_e_spec[2:26])/exposure
+# 	ref_countrate = 1171.72770365
+	ref_countrate = 1307.3
 # 	print "CI countrate:", ci_countrate
 # 	print "Ref band countrate:", ref_countrate
-	
+	print "Start: mean countrate in channel 6:", ci_countrate[6]
+
+
 	############################################################
 	## Looping through the independent realizations/simulations
 	############################################################
@@ -339,13 +327,12 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		cs_sum = np.zeros((n_bins, detchans))
 		sum_power_ci = np.zeros((n_bins, detchans), dtype=np.float64)
 		sum_power_ref = np.zeros(n_bins, dtype=np.float64)
-		sum_rate_whole_ci = np.zeros(detchans, dtype=np.float64)
-		sum_rate_whole_ref = 0
+		sum_rate_ci_whole = np.zeros(detchans, dtype=np.float64)
+		sum_rate_ref_whole = 0
 		cs_sum = np.zeros((n_bins, detchans), dtype=np.complex128)
 		mean_pow = np.zeros(ks_lc_len)
 		count_numseg = 0
 		count_lc = 0
-		mean_rate = 0
 	
 		########################################################################
 		## Generating the light curve in 2048-second chunks and splitting it up
@@ -399,7 +386,7 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 						
 			## Get light curve from Fourier transform
 			light_curve = fftpack.ifft(FT).real
-			
+
 			###########################################################
 			## Looping through the segments per simulation/realization
 			###########################################################
@@ -421,70 +408,77 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 					counts = (this_lc + ci_countrate[j]) * dt
 					counts[np.where(counts < 0)] = 0.0
 					rate_ci[:,j] = np.random.poisson(counts) / dt
-				
-				rate_ref = np.random.poisson((this_lc + ref_countrate) * dt) / dt
+					
+				counts = (this_lc + ref_countrate) * dt
+				counts[np.where(counts < 0)] = 0.0
+				rate_ref = np.random.poisson(counts) / dt
+# 				rate_ref = this_lc + ref_countrate
 				
 				## Compute cross spectrum
-				cs_seg, mean_rate_seg_ci, mean_rate_seg_ref, power_ci, \
+				cs_seg, mean_rate_ci_seg, mean_rate_ref_seg, power_ci, \
 					power_ref = xcf.make_cs(rate_ci, rate_ref, n_bins, detchans)
 
+				## Incrementing for the next run; removing this_lc from light_curve
 				count_numseg += 1
 				light_curve = light_curve[n_bins:]
 				
 				## Sums across segments -- arrays, so it adds by index
-				sum_rate_whole_ci += mean_rate_seg_ci
-				sum_rate_whole_ref += mean_rate_seg_ref
+				sum_rate_ci_whole += mean_rate_ci_seg
+				sum_rate_ref_whole += mean_rate_ref_seg
 				sum_power_ci += power_ci
 				sum_power_ref += power_ref
 				cs_sum += cs_seg
-# 				total_lc = np.append(total_lc, mean_lc)
-# 				mean_rate += mean_rate_seg
+				total_lc = np.append(total_lc, rate_ref)
 
 			## End of for-loop through the segments
 			count_lc += 1
 			
 		## End of while loop through ks lightcurves
 		
-# 		mean_rate /= float(num_seg)
-		print "Mean count rate:", mean_rate
 		tot_freq = fftpack.fftfreq(n_bins, d=dt)
 		nyq_index = np.argmax(tot_freq) + 2  # +1 for nyquist, +1 for list cutoff 
 		tot_freq = np.abs(tot_freq[0:nyq_index])
 		nyq_seg = np.max(tot_freq)
 		mean_pow /= float(num_seg)
 		
-		mean_rate_whole_ci = sum_rate_whole_ci / float(num_seg)
-		mean_rate_whole_ref = sum_rate_whole_ref / float(num_seg)
+		mean_rate_ci_whole = sum_rate_ci_whole / float(num_seg)
+		mean_rate_ref_whole = sum_rate_ref_whole / float(num_seg)
 		mean_power_ci = sum_power_ci / float(num_seg)
 		mean_power_ref = sum_power_ref / float(num_seg)
 		cs_avg = cs_sum / float(num_seg)
 		
+# 		cs_avg *= 0.065 ## This is a hack because I can't explain why the T&K 
+			## cs and ccf are more than 10x larger than the data cs and ccf
+		
+		print "CS avg:", cs_avg[1:5, 6]
+		print "End: mean countrate in chan 6:", mean_rate_ci_whole[6]
+		print "End: mean countrate in ref:", mean_rate_ref_whole
 		df_seg  = 1.0 / float(num_seconds)
 		
 		## Fractional rms^2 normalization
 # 		fracrms_power = mean_pow * 2.0 * dt / float(n_bins) / (ref_countrate ** 2)  
 # 		fracrms_power = fracrms_power[0:nyq_index]
 		
-		fracrms_power = mean_power_ref * 2.0 * dt / float(n_bins) / (mean_rate_whole_ref ** 2)
+		fracrms_power = mean_power_ref * 2.0 * dt / float(n_bins) / (mean_rate_ref_whole ** 2)
 		fracrms_power = fracrms_power[0:nyq_index]
-		fracrms_power -= (2.0 / mean_rate_whole_ref)
+		fracrms_power -= (2.0 / mean_rate_ref_whole)
 		
 		total_variance = np.sum(fracrms_power * df_seg)
-		print "\nVariance of plotted:", total_variance, "(frac rms)"
-		print "Variance of plotted:", total_variance * (ref_countrate ** 2), "(abs rms)"
+# 		print "\nVariance of plotted:", total_variance, "(frac rms)"
+# 		print "Variance of plotted:", total_variance * (ref_countrate ** 2), "(abs rms)"
 		rms_total = np.sqrt(total_variance)
-		print "Rms of plotted: ", rms_total, "(frac rms)"
+# 		print "Rms of plotted: ", rms_total, "(frac rms)"
 		
 		###################################
 		## Computing the cross correlation
 		###################################
 		
 		ccf_end, ccf_error = xcf.UNFILT_cs_to_ccf_w_err(cs_avg, dt, n_bins, \
-			detchans, num_seconds, num_seg, mean_rate_whole_ci, \
-			mean_rate_whole_ref, mean_power_ci, mean_power_ref, True)
+			detchans, num_seconds, num_seg, mean_rate_ci_whole, \
+			mean_rate_ref_whole, mean_power_ci, mean_power_ref, True)
 		
-		print "Mean rate for all of ci:", np.sum(mean_rate_whole_ci)
-		print "Mean rate for ref:", mean_rate_whole_ref
+# 		print "Mean rate for all of ci:", np.sum(mean_rate_ci_whole)
+# 		print "Mean rate for ref:", mean_rate_ref_whole
 		
 		## Printing the first 100 ccf values to a table
 		sim_table_out(ccf_end)
@@ -496,13 +490,13 @@ def main(n_bins, dt, num_seg, num_sim, psd_variance, exposure, \
 		##########
 		
 		if i == 0:
-			power_out(psd_file, tot_freq, fracrms_power, dt, n_bins, nyq_seg, num_seg,\
-				mean_rate_whole_ref)
+			power_out(psd_file, tot_freq, fracrms_power, dt, n_bins, nyq_seg, \
+				num_seg, mean_rate_ref_whole)
 	
-# 			lc_out(dt, total_lc)
+			lc_out(dt, total_lc)
 	
-			ccf_out(ccf_file, dt, n_bins, detchans, num_seg, mean_rate_whole_ci, \
-				mean_rate_whole_ref, t, ccf_end, ccf_error)	
+			ccf_out(ccf_file, dt, n_bins, detchans, num_seg, mean_rate_ci_whole, \
+				mean_rate_ref_whole, t, ccf_end, ccf_error)	
 		## End of 'if i = 0 then do output'
 		
 	## End of loop through simulations/realizations
