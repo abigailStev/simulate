@@ -1,11 +1,13 @@
 import argparse
 from datetime import datetime
-import os
+import os.path
+import subprocess
 import numpy as np
 from scipy import fftpack
 import matplotlib.pyplot as plt
 import itertools
 from astropy.io import fits
+
 import ccf as xcf
 import simulate_lightcurves as simlc
 import tools
@@ -57,7 +59,7 @@ def lc_out(dt, lightcurve):
 # # 		'ERROR: Standard output file must have extension ".fits".'
 # 	if os.path.isfile(out_file):
 # # 		print "File previously existed. Removing and rewriting."
-# 		os.remove(out_file)
+# 		subprocess.call(["rm", out_file])
 # 		
 # 	## Writing the standard power spectrum to a FITS file
 # 	thdulist = fits.HDUList([prihdu, tbhdu])
@@ -98,7 +100,7 @@ def power_out(out_file, freq, power, dt, n_bins, nyquist, num_seg, mean_rate):
 		'ERROR: Standard output file must have extension ".fits".'
 	if os.path.isfile(out_file):
 # 		print "File previously existed. Removing and rewriting."
-		os.remove(out_file)
+		subprocess.call(["rm", out_file])
 		
 	## Writing the standard power spectrum to a FITS file
 	thdulist = fits.HDUList([prihdu, tbhdu])
@@ -158,7 +160,7 @@ def ccf_out(out_file, dt, n_bins, detchans, num_segments, mean_rate_ci_whole, \
     assert out_file[-4:].lower() == "fits", \
     	'ERROR: Output file must have extension ".fits".'
     if os.path.isfile(out_file):
-    	os.remove(out_file)
+    	subprocess.call(["rm", out_file])
     	
     ## Writing to a FITS file
     thdulist = fits.HDUList([prihdu, tbhdu])
