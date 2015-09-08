@@ -46,7 +46,7 @@ dump_file=dump.txt # Name of dumping file for intermediary steps
 fit_specifier="1BB_FS-G-NE_wMCMC"
 #fit_specifier="2BB_FS-G-kT"
 #sinefit_file="$es_dir/${prefix}_${day}_sines.txt"
-sinefit_file="$es_dir/${prefix}_${day}_sines_${fit_specifier}.txt"
+sinefit_file="$es_dir/${prefix}_${day}_${fit_specifier}_sines.txt"
 out_name="${prefix}_${day}_t${dt_mult}_${numsec}sec"
 ccf_file="$ccf_dir/${out_name}_adj.fits"
 
