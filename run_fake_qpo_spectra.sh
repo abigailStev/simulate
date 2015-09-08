@@ -45,8 +45,8 @@ out_dir="$exe_dir/out_sim/${prefix}"
 dump_file=dump.txt # Name of dumping file for intermediary steps
 fit_specifier="1BB_FS-G-NE_wMCMC"
 #fit_specifier="2BB_FS-G-kT"
-#sinefit_file="$es_dir/${prefix}_${day}_sines.txt"
-sinefit_file="$es_dir/${prefix}_${day}_${fit_specifier}_sines.txt"
+#parfit_file="$es_dir/${prefix}_${day}_sines.txt"
+parfit_file="$es_dir/${prefix}_${day}_${fit_specifier}_sines.txt"
 out_name="${prefix}_${day}_t${dt_mult}_${numsec}sec"
 ccf_file="$ccf_dir/${out_name}_adj.fits"
 
@@ -79,12 +79,12 @@ n_params=9
 
 out_root="${out_dir}/${out_name}"
 
-if [ -e "${sinefit_file}" ]; then
-    python "$exe_dir"/fake_qpo_spectra.py "${out_root}" "${sinefit_file}" \
+if [ -e "${parfit_file}" ]; then
+    python "$exe_dir"/fake_qpo_spectra.py "${out_root}" "${parfit_file}" \
             --prefix "${prefix}" --n_bins "${n_bins}" --dt "${dt}" \
             --n_seg "${n_seg}" --n_spec "${n_spectra}" --n_par "${n_params}" \
             --chan "${detchans}" --epoch "${epoch}" --exposure "${obs_time}" \
             --test "${testing}"
 else
-    echo -e "\t ERROR: Sine fit file does not exist."
+    echo -e "\t ERROR: Parameter fit file does not exist."
 fi
