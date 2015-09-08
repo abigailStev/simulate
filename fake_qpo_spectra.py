@@ -15,14 +15,16 @@ __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
 
 """
 Makes legit fake QPO and does spectral timing from a set of energy spectral
-parameters (either tied value of parameters of best-fit sine wave to QPO-phase
-variations), from energy_spectra/multifit_plots.py.
+parameters (either tied value of parameters of best-fit sine wave to the
+parameter variation with QPO-phase), from energy_spectra/multifit_plots.py.
+
+Location of 'simpler' XSPEC model and the PCU response matrix are hardwired in.
 """
 class Parameter(object):
     """
     This Parameter class is slightly different from the one in multfit_plots.py.
     This one doesn't have any strings for model name or plot label, and requires
-     num_spectra.
+    num_spectra.
     """
     def __init__(self, num_spectra):
         self.value = np.zeros(num_spectra)
@@ -221,7 +223,7 @@ def make_powerspectrum(power_array, mean_rate_array, meta_dict, prefix, \
     nothing
 
     """
-    print np.shape(power_array)
+    # print np.shape(power_array)
     mean_rate = np.mean(mean_rate_array)
     power = xcf.seg_average(power_array)
 
@@ -521,7 +523,7 @@ def main(out_root, sinefit_file, prefix, n_bins, dt, num_seg, detchans,\
     make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
             out_root)
 
-    print "place 2"
+    # print "place 2"
 
     ##################################################
     ## Making a lag-energy and lag_frequency spectrum
