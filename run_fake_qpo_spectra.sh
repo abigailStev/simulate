@@ -43,14 +43,19 @@ es_dir="$home_dir/Dropbox/Research/energy_spectra/out_es/${prefix}"
 exe_dir="$home_dir/Dropbox/Research/simulate"
 out_dir="$exe_dir/out_sim/${prefix}"
 dump_file=dump.txt # Name of dumping file for intermediary steps
-fit_specifier="1BB_FS-G-NE_wMCMC"
-#fit_specifier="2BB_FS-G-kT"
-#parfit_file="$es_dir/${prefix}_${day}_sines.txt"
-parfit_file="$es_dir/${prefix}_${day}_${fit_specifier}_sines.txt"
-out_name="${prefix}_${day}_t${dt_mult}_${numsec}sec"
-ccf_file="$ccf_dir/${out_name}_adj.fits"
+#fit_specifier="1BB-Nicer"
+#fit_specifier="1BB-FS-G-NE_wMCMC"
+#fit_specifier="1BB-FS-G-Tin-fzs-fzNbb"
+#fit_specifier="2BB-FS-G-kT"
+#fit_specifier="2BB-FS-G-kT"
+parfit_file="$es_dir/${prefix}_${day}_sines.txt"
 
-prefix="FAKE-${prefix}"
+echo Fit specifier: "$fit_specifier"
+parfit_file="$es_dir/${prefix}_${day}_${fit_specifier}_sines.txt"
+ccf_file="$ccf_dir/${prefix}_${day}_t${dt_mult}_${numsec}sec_adj.fits"
+
+#prefix="FAKE-NICER"
+#prefix="FAKE-${prefix}-Nicer"
 out_name="${prefix}_${day}_${fit_specifier}"
 
 tab_ext="dat"
@@ -60,22 +65,28 @@ plot_ext="eps"
 ################################################################################
 
 if [ ! -d "$out_dir" ]; then mkdir -p "$out_dir"; fi
-if [ ! -e "$ccf_file" ]; then echo -e "\tCCF file does not exist."; exit; fi
+#if [ ! -e "$ccf_file" ]; then echo -e "\tCCF file does not exist."; exit; fi
 #obs_time=$(python -c "from tools import get_key_val; print get_key_val('$ccf_file', 0, 'EXPOSURE')")
 #dt=$(python -c "from tools import get_key_val; print get_key_val('$ccf_file', 0, 'DT')")
 #n_seg=$(python -c "from tools import get_key_val; print get_key_val('$ccf_file', 0, 'SEGMENTS')")
 #detchans=$(python -c "from tools import get_key_val; print get_key_val('$ccf_file', 0, 'DETCHANS')")
 #n_bins=$(python -c "from tools import get_key_val; print get_key_val('$ccf_file', 0, 'N_BINS')")
 
-obs_time=13220
-dt=.0078125
+obs_time=13224.3984375
+#obs_time=640
+dt=0.0078125
 n_seg=198
+#n_seg=10
 detchans=64
+#detchans=238
 n_bins=8192
 
 epoch=5
-n_spectra=24
-n_params=9
+#n_spectra=24
+#n_params=11
+
+echo "$n_spectra"
+echo "$n_params"
 
 out_root="${out_dir}/${out_name}"
 

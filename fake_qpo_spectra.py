@@ -3,68 +3,134 @@ import subprocess
 import os
 import warnings
 import argparse
+from astropy.io import fits
 import simulate_lightcurves as simlc
 import powerspec as psd
 import rebin_powerspec as rb_psd
 import ccf as xcf
 import plot_ccf as p_xcf
+import plot_2d as p2D_xcf
 import get_lags as lags
 import tools
 
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
+__year__ = "2015"
 
 """
-Makes legit fake QPO and does spectral timing from a set of energy spectral
-parameters (either tied value of parameters of best-fit sine wave to the
+Makes legit fake QPO and does spectral-timing from a set of SED
+parameters (either tied value of parameters of best-fit function to the
 parameter variation with QPO-phase), from energy_spectra/multifit_plots.py.
 
 Location of 'simpler' XSPEC model and the PCU response matrix are hardwired in.
 """
+
 class Parameter(object):
     """
     This Parameter class is slightly different from the one in multfit_plots.py.
     This one doesn't have any strings for model name or plot label, and requires
-    num_spectra.
+    n_spectra.
     """
-    def __init__(self, num_spectra):
-        self.value = np.zeros(num_spectra)
+    def __init__(self, n_spectra):
+        self.value = np.zeros(n_spectra)
         self.error = 0
         self.lo_v = 0
         self.hi_v = 0
         self.pos_err = 0
         self.neg_err = 0
         self.varying = False
-        self.sinefit = np.zeros(num_spectra)
-        self.best_fit = np.zeros(3)  ## three parameters used to define a sine
+        self.funcfit = np.zeros(n_spectra)
+        self.best_fit = np.zeros(5)
         self.phase = None
         self.phase_err = None
 
 
 ################################################################################
+def fit_function(t, p):
+    """
+    Computing a function to fit to the SED parameter variations. This is exactly
+     the same as what's in energy_spectra/multifit_plots.py.
+
+    Parameters
+    ----------
+    t : np.array of floats
+        1-D array of time steps for the fit function.
+    p : np.array of floats
+        1-D array of the function parameters.
+
+    Returns
+    -------
+    np.array of floats
+        1-D array of the function fit to the data at steps t with parameters p.
+    """
+    return p[0] * np.sin(2. * np.pi * t + p[1]) + \
+           p[2] * np.sin(2. * 2. * np.pi * t + p[3]) + p[4]
+
+
+################################################################################
 def average_of_parameter(temp_stack):
-    # print np.shape(temp_stack)
+    """
+    Takes the average of a 2-D array of values along the 0 axis. Excludes the
+    0th row from this average because reasons. (because the arrays are defined
+    with zeros going down the zeroth row, and those get removed later once stuff
+    is appended to that)
+
+    Parameters
+    ----------
+    temp_stack : np.array of floats
+        2-D array of parameter values.
+
+    Returns
+    -------
+    np.array of floats
+        1-D array of averaged parameter values.
+    """
+    # print "Before:", np.shape(temp_stack)
     temp_stack = np.average(temp_stack[1:,:], axis=0)
-    # print np.shape(temp_stack)
+    # print "After:", np.shape(temp_stack)
     # print temp_stack
 
     return temp_stack
 
+
 ################################################################################
-def read_parameters(sinefit_file, num_spectra, num_params):
+def read_parameters(funcfit_file, n_spectra, n_params):
+    """
+    Reads in the fit function parameters that were put out by multifit_plots.py.
+
+    Parameters
+    ----------
+    funcfit_file : str
+        The full path of the file with the best-fitting function parameters.
+
+    n_spectra : int
+        The number of QPO phase-resolved SEDs that were simultaneously fit,
+        i.e. the number of x-axis points for the fit function.
+
+    n_params : int
+        The number of SED parameters for all models for one data set.
+
+    Returns
+    -------
+    np.array of Parameter objects
+        1-D array (size=n_params) of all the SED parameters for one data set.
+
+    str
+        The SED model as fed into XSPEC, with no spaces.
+    """
 
     tinybins = np.arange(0, 1.0, 0.01)
     model = []
-    parameters = np.array([Parameter(num_spectra) for i in range(num_params)])
+    parameters = np.array([Parameter(n_spectra) for i in range(n_params)])
     # print np.shape(parameters)
 
-    with open(sinefit_file, 'r') as f:
+    with open(funcfit_file, 'r') as f:
 
         for line in f:
             line_element = line.strip().split("    ")
             model.append(line_element[0])
             assert line_element[0] == model[0]
 
-            for (element, i) in zip(line_element[1:], range(num_params)):
+            for (element, i) in zip(line_element[1:], range(n_params)):
                 if "[" in element or "]" in element or "," in element:
                     parameters[i].varying = True
                     # print "Best fit par before:", parameters[i].best_fit
@@ -76,7 +142,7 @@ def read_parameters(sinefit_file, num_spectra, num_params):
                 else:
                     temp = float(element)
                     parameters[i].value = np.vstack((parameters[i].value,
-                            np.repeat(temp, num_spectra) ))
+                            np.repeat(temp, n_spectra) ))
 
                     # print "Value shape:", np.shape(parameters[k].value)
 
@@ -90,38 +156,39 @@ def read_parameters(sinefit_file, num_spectra, num_params):
     for component in parameters:
         if component.varying:
             component.best_fit = average_of_parameter(component.best_fit)
-            smooth_sine = component.best_fit[0] * np.sin(2.0 * np.pi * \
-                    tinybins + component.best_fit[1]) + component.best_fit[2]
-            sine_split = np.array_split(smooth_sine, num_spectra)
+
+            smooth_func = fit_function(tinybins, component.best_fit)
+            func_split = np.array_split(smooth_func, n_spectra)
             component.value = np.array([np.mean(element) for element in \
-                    sine_split])
-            print component.best_fit
+                    func_split])
+            # print component.best_fit
         else:
             component.value = average_of_parameter(component.value)
-            print component.value
+            # print component.value
 
     print("Model: %s" % model[0])
     return parameters, model[0]
 
+
 ################################################################################
-def run_fakeit(parameters, model, exposure, num_spectra, out_root):
+def run_fakeit(parameters, model, exposure, n_spectra, out_root):
     """
-    Makes fake energy spectra for each part of the QPO phase with the HEAsoft
-    FTOOL "fakeit".
+    Makes fake SED for each part of the QPO phase with the HEAsoft FTOOL
+    "fakeit".
 
     Parameters
     ----------
-    parameters : list
-        List of energy spectral parameters.
+    parameters : list of Parameter objects
+        List of SED parameters.
 
     model : str
-        The full energy spectral model to fake.
+        The full SED model to fake.
 
     exposure : float
         Total exposure time of the observation, in seconds.
 
-    num_spectra : int
-        Total number of spectra per QPO phase to make/use.
+    n_spectra : int
+        Total number of SEDs per QPO phase to make/use.
 
     out_root : str
         Root of name of the output file (i.e., without extension).
@@ -129,10 +196,11 @@ def run_fakeit(parameters, model, exposure, num_spectra, out_root):
     Returns
     -------
     list of strings
-        The file names of the fake spectra created.
+        The file names of the fake SEDs created.
     """
 
     rsp_matrix = "GX339-BQPO_PCU2.rsp"
+    # rsp_matrix = "/Users/abigailstevens/Dropbox/Academic/Conferences_and_Talks/DC_talks/NICER_May2014_rbn.rsp"
     fake_spec_list = []
     current_dir = os.getcwd()
     # print "Current dir:", current_dir
@@ -141,7 +209,7 @@ def run_fakeit(parameters, model, exposure, num_spectra, out_root):
     os.chdir(out_dir)
     out_file = os.path.basename(out_root)
 
-    for spec_num in np.arange(num_spectra):
+    for spec_num in np.arange(n_spectra):
         # subprocess.call(["cd", out_dir])
 
         # out_file = "%s_%d" % (out_root, spec_num)
@@ -186,7 +254,7 @@ def run_fakeit(parameters, model, exposure, num_spectra, out_root):
             fake_spec_list.append("%s/%s" % (out_dir, fake_spec))
             # print tools.get_key_val(fake_spec, 1, "POISSERR")
         else:
-            warnings.warn("Fake spectrum #%d doesn't exist. Exiting." % \
+            warnings.warn("Fake SED #%d doesn't exist. Exiting." % \
                     spec_num, RuntimeWarning)
             exit()
 
@@ -203,19 +271,19 @@ def make_powerspectrum(power_array, mean_rate_array, meta_dict, prefix, \
 
     Parameters
     ----------
-    power_array : np.array of floats (n_bins x num_seg)
-        2-D array of the unnormalized power spectrum.
+    power_array : np.array of floats
+        2-D array (size = n_bins x n_seg) of the un-normalized power spectrum.
 
-    mean_rate_array : np.array of floats (num_seg)
-        1-D array of the mean count rate.
+    mean_rate_array : np.array of floats
+        1-D array (size = n_seg) of the mean count rate.
 
     meta_dict : dict
         Dictionary of important parameters.
 
-    prefix : string
+    prefix : str
         Identifying prefix of the simulated data (should start with 'FAKE').
 
-    out_root : string
+    out_root : str
         Root of the output file name, including full directory path.
 
     Returns
@@ -255,8 +323,8 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
 
     Parameters
     ---------
-    cross_spec_array : np.array of complex numbers (n_bins x detchans x num_seg)
-        3-D array of the cross spectrum.
+    cross_spec_array : np.array of complex numbers
+        3-D array (size = n_bins x detchans x n_seg) of the cross spectrum.
 
     ci : Lightcurve object
         Channel of interest.
@@ -294,7 +362,7 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
     plot_file = out_root+"_ccf.eps"
     t = np.arange(0, meta_dict['n_bins'])
 
-    meta_dict['dt'] = np.repeat(meta_dict['dt'], meta_dict['num_seg'])
+    meta_dict['dt'] = np.repeat(meta_dict['dt'], meta_dict['n_seg'])
 
     ccf = xcf.UNFILT_cs_to_ccf(cross_spec, meta_dict, ref, False)
     ccf_error = xcf.standard_ccf_err(cross_spec_array, meta_dict, ref, False)
@@ -308,26 +376,92 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
     time_bins = np.append(neg_time_bins, pos_time_bins)
 
     # print np.shape(ccf)
-    ccf = ccf[:,15]
-    pos_time_ccf = ccf[0:meta_dict['n_bins']/2]
-    neg_time_ccf = ccf[meta_dict['n_bins']/2:]
-    ccf = np.append(neg_time_ccf, pos_time_ccf)
+    ccf_15 = ccf[:,15]
+    pos_time_ccf = ccf_15[0:meta_dict['n_bins']/2]
+    neg_time_ccf = ccf_15[meta_dict['n_bins']/2:]
+    ccf_15 = np.append(neg_time_ccf, pos_time_ccf)
 
     ccf_error = ccf_error[:,15]
     pos_time_ccf_err = ccf_error[0:meta_dict['n_bins']/2]
     neg_time_ccf_err = ccf_error[meta_dict['n_bins']/2:]
     ccf_err = np.append(neg_time_ccf_err, pos_time_ccf_err)
 
-    p_xcf.make_plot(time_bins, ccf, ccf_err, meta_dict['n_bins'], prefix, \
+    p_xcf.make_plot(time_bins, ccf_15, ccf_err, meta_dict['n_bins'], prefix, \
             plot_file, 15, 128)
 
-    subprocess.call(["open", plot_file])
+    t_length = 100
+    ccf = ccf[meta_dict['n_bins']/2-t_length:meta_dict['n_bins']/2+t_length].T
+    t_bins = time_bins[meta_dict['n_bins']/2-t_length:meta_dict['n_bins']/2+t_length]
+    #
+    # energies = np.loadtxt("/Users/abigailstevens/Dropbox/Academic/Conferences_and_Talks/DC_talks/NICER-energies.dat")
+    # plot_file = out_root+"ccf_2D.eps"
+    # p2D_xcf.make_plot(ccf, t_bins, ci.mean_rate, t_length, 128, plot_file, energies)
+
+    # subprocess.call(["open", plot_file])
+
+
+################################################################################
+def chisquared_lagspectrum(data_file, sim_file):
+    """
+    Computes the chisquared statistic of the simulated lag-energy spectrum with
+    the data's lag-energy spectrum.
+
+    S. Vaughan, "Scientific Inference: Learning from data" 1st ed, p134 eq 6.12
+
+    Parameters
+    ----------
+    data_file : string
+        Name of the FITS file with the lags of the data.
+
+    sim_file : string
+        Name of the FITS file with the lags of the simulation.
+
+    Returns
+    -------
+    float
+        The chisquared fit statistic of the simulation's lag-energy spectrum
+        with the data's lag-energy spectrum.
+
+    """
+
+    try:
+        data_hdu = fits.open(data_file)
+    except IOError:
+        print "\tERROR: File does not exist: %s" % data_file
+        exit()
+
+    try:
+        sim_hdu = fits.open(sim_file)
+    except IOError:
+        print "\tERROR: File does not exist: %s" % sim_file
+        exit()
+
+    data_lag = data_hdu[2].data.field('TIME_LAG')
+    data_err = data_hdu[2].data.field('TIME_LAG_ERR')
+    sim_lag = sim_hdu[2].data.field('TIME_LAG')
+
+    data_lag = np.delete(data_lag, 10)
+    data_err = np.delete(data_err, 10)
+    sim_lag = np.delete(sim_lag, 10)
+
+    ## Only fitting between 3-20 keV (incl)
+    data_lag = data_lag[2:25]
+    data_err = data_err[2:25]
+    sim_lag = sim_lag[2:25]
+
+    resids = np.square(data_lag - sim_lag) / np.square(data_err)
+    chisquared = np.sum(resids)
+
+    return chisquared, len(data_lag) + len(sim_lag)
 
 
 ################################################################################
 def make_lagspectrum(out_root, prefix):
     """
-    Makes lag-energy and lag-frequency spectra of the simulated data.
+    Makes lag-energy and lag-frequency spectra of the simulated data, and
+    computes the chisquared fit statistic of the simulation with the data.
+
+    WARNING: data file name is hard-coded!
 
     Parameters
     ---------
@@ -348,51 +482,66 @@ def make_lagspectrum(out_root, prefix):
     lags.main(in_file, out_file, out_root, prefix, "eps", 4.0, 7.0, 3, 20)
     subprocess.call(["open", out_root + "_lag-energy.eps"])
 
+    data_file = "/Users/abigailstevens/Dropbox/Research/lags/out_lags/GX339-"\
+            "BQPO/GX339-BQPO_150902_t64_64sec_adj_lag.fits"
+
+    chisquared, dof = chisquared_lagspectrum(data_file, out_file)
+    print chisquared, dof
+
+    ensp_model_file = "/Users/abigailstevens/Dropbox/Research/CCF_paper1/ensp_"\
+            "models.txt"
+
+    with open(ensp_model_file, 'a') as out:
+        out.write("$%.3f / %d$  & \\ ref{ } \\\\ \n" % (chisquared, dof))
+
 
 ################################################################################
-def main(out_root, sinefit_file, prefix, n_bins, dt, num_seg, detchans,\
-        exposure, num_spectra, num_params, epoch, test, psd_flag):
+def main(out_root, funcfit_file, prefix, n_bins, dt, n_seg, detchans,\
+        exposure, n_spectra, n_params, epoch, test, psd_flag):
     """
     Main of fake_qpo_spectra.py
 
     Parameters
     ----------
     out_root : str
-        Description.
+        The full path of the file to write the FITS output to.
 
-    sinefit_file : str
-        Description.
+    funcfit_file : str
+        The full path of the text file containing the fit function parameters
+        of the SED parameter variations.
 
     prefix : str
         The identifying prefix of the data. Should have 'FAKE' in it for
         simulated data.
 
-    num_seconds : float
-        Number of seconds per segment of lightcurve.
+    n_bins : int
+        Number of time bins in a segment of light curve.
 
     dt : float
         Timestep between time bins.
 
-    num_seg : int
-        Number of segments to compute (i.e., length of lightcurve).
+    n_seg : int
+        Number of segments to compute (i.e., length of light curve).
 
     exposure : float
         The exposure time of the fake observation.
 
-    num_spectra : int
-        Number of phase-resolved energy spectra per QPO phase.
+    n_spectra : int
+        Number of phase-resolved SEDs per QPO phase.
 
-    num_params : int
-        Total number of spectral parameters in one energy spectrum.
+    n_params : int
+        Total number of parameters in one SED.
 
     epoch : int
-        RXTE observation epoch.
+        RXTE observation epoch (affects the keV energy of the detector channels,
+        which affects which ones we bin up for the reference band, and the
+        conversion from channel to keV for plotting).
 
     test : bool
         If true, runs one segment for testing.
 
     psd_flag : bool
-        If true, computes and prints the power density spectrum of the fake QPO.
+        If true, computes and prints the power spectral density of the fake QPO.
 
     Returns
     -------
@@ -400,45 +549,51 @@ def main(out_root, sinefit_file, prefix, n_bins, dt, num_seg, detchans,\
     """
 
     if test:
-        num_seg = 1
+        n_seg = 1
 
-    adjust_seg = 0
-    num_seconds = n_bins * dt
+    adjust_seg = 0  ## No need to adjust perfectly simulated data.
+    n_seconds = n_bins * dt
     nyquist_freq = 1.0 / (2.0 * dt)
-    df = 1.0 / float(num_seconds)
+    df = 1.0 / float(n_seconds)
 
-    meta_dict = {'dt': dt, 'num_seconds': num_seconds, 'df': df, \
-            'nyquist': nyquist_freq, 'n_bins': n_bins, 'detchans': detchans, \
-            'adjust_seg': adjust_seg, 'num_seg': num_seg, 'obs_epoch': epoch,
-            'exposure': exposure}
-    print_seg = 20
+    meta_dict = {'dt': dt,
+                 'n_seconds': n_seconds,
+                 'df': df,
+                 'nyquist': nyquist_freq,
+                 'n_bins': n_bins,
+                 'detchans': detchans,
+                 'adjust_seg': adjust_seg,
+                 'n_seg': n_seg,
+                 'obs_epoch': epoch,
+                 'exposure': exposure}
     # print(meta_dict)
+    print_seg = 20
 
     ############################################################
-    ## Reading in energy spectral parameters from the text file
+    ## Reading in SED parameters from the text file
     ############################################################
-    parameters, model = read_parameters(sinefit_file, num_spectra, num_params)
+    parameters, model = read_parameters(funcfit_file, n_spectra, n_params)
 
     #############################################
-    ## Making fake energy spectra for one period
+    ## Making fake SED for one period
     #############################################
-
+    print "Running fakeit"
     fake_spec_list = run_fakeit(parameters, model, meta_dict['exposure'], \
-            num_spectra, out_root)
+            n_spectra, out_root)
+    print "finished fakeit"
+    spectra = np.zeros((n_spectra, meta_dict['detchans']))
 
-    spectra = np.zeros((num_spectra, meta_dict['detchans']))
-
-    for (spec_file, num_spec) in zip(fake_spec_list, np.arange(num_spectra)):
+    for (spec_file, n_spec) in zip(fake_spec_list, np.arange(n_spectra)):
 
         single_spectrum = simlc.read_fakeit_spectra(spec_file)
         assert len(single_spectrum) == detchans, "ERROR: Channels of fake "\
-                "energy spectrum do not match the expected detector energy"\
+                "SED do not match the expected detector energy"\
                 " channels."
-        spectra[num_spec,:] = single_spectrum
+        spectra[n_spec,:] = single_spectrum
 
-    num_repeat = np.ceil(float(meta_dict['n_bins']+meta_dict['num_seg']) / \
-            float(num_spectra))
-    spectra = np.tile(spectra, (num_repeat, 1))
+    n_repeat = np.ceil(float(meta_dict['n_bins']+meta_dict['n_seg']) / \
+            float(n_spectra))
+    spectra = np.tile(spectra, (n_repeat, 1))
 
     #############################################
     ## Looping through the segments to do timing
@@ -456,17 +611,17 @@ def main(out_root, sinefit_file, prefix, n_bins, dt, num_seg, detchans,\
 
     # mean = 5.42089871724  ## Hz
     # std_dev = 0.352722903769
-    # frequencies = np.random.normal(loc=mean, scale=std_dev, size=num_seg)
-    # num_spectra = 1 / frequencies / dt
-    # num_spectra = num_spectra.astype(int)
-    # print num_spectra
+    # frequencies = np.random.normal(loc=mean, scale=std_dev, size=n_seg)
+    # n_spectra = 1 / frequencies / dt
+    # n_spectra = n_spectra.astype(int)
+    # print n_spectra
 
     print("Segments computed:")
-    # for (segment, num_spectra) in zip(np.arange(num_seg), num_spectra):
-    for segment in np.arange(num_seg):
+    # for (segment, n_spectra) in zip(np.arange(n_seg), n_spectra):
+    for segment in np.arange(n_seg):
 
-        if num_seg % print_seg == 0:
-            print("\t%d" % num_seg)
+        if segment % print_seg == 0:
+            print("\t%d" % segment)
 
         ## Change lightcurve into count RATE units in here by dividing by the
         ## exposure time.
@@ -496,6 +651,8 @@ def main(out_root, sinefit_file, prefix, n_bins, dt, num_seg, detchans,\
                 np.reshape(ci_seg.mean_rate, (meta_dict['detchans'], 1)) ))
         ref.mean_rate_array = np.vstack((ref.mean_rate_array, \
                 ref_seg.mean_rate))
+
+    print("Number of segments computed: %d" % n_seg)
 
     ## Cutting off the initializing zeros
     mean_rate_array_1D = mean_rate_array_1D[1:]
@@ -532,7 +689,6 @@ def main(out_root, sinefit_file, prefix, n_bins, dt, num_seg, detchans,\
     make_lagspectrum(out_root, prefix)
 
 
-
 ################################################################################
 if __name__ == "__main__":
 
@@ -541,18 +697,18 @@ if __name__ == "__main__":
     ##############################################
 
     parser = argparse.ArgumentParser(usage="python fake_qpo_spectra.py outroot"\
-            " sinefitfile [OTHER ARGUMENTS]", \
+            " funcfitfile [OTHER ARGUMENTS]", \
             description="Computes a fake QPO power spectrum, ccf, and lag-"\
-            "energy spectrum given the parameters of the best-fit sine wave to "\
-            "the energy spectral parameter variations with QPO phase.", \
+            "energy spectra given the parameters of the best-fit sine wave to "\
+            "the SED parameter variations with QPO phase.", \
             epilog="For optional arguments, default values are given in "\
             "brackets at end of description.")
 
     parser.add_argument('outroot', help="The root of the file names to write "\
             "the different outputs to.")
 
-    parser.add_argument('sinefitfile', help="Full path of the text file with "\
-            "the best-fit sine wave paramters of the varying energy spectral "\
+    parser.add_argument('funcfitfile', help="Full path of the text file with "\
+            "the best-fitting function paramters of the varying SED "\
             "parameters.")
 
     parser.add_argument('--prefix', dest='prefix', help="Identifying prefix of"\
@@ -562,19 +718,19 @@ if __name__ == "__main__":
             default=1, dest='n_bins', help="Number of time bins in each "\
             "Fourier segment. Must be a power of 2, positive, integer. [1]")
 
-    parser.add_argument('--dt', type=tools.type_positive_float, default=1, dest='dt',
-            help="Timestep between bins, in seconds. [1]")
+    parser.add_argument('--dt', type=tools.type_positive_float, default=1, \
+            dest='dt', help="Timestep between bins, in seconds. [1]")
 
     parser.add_argument('-g', '--n_seg', type=tools.type_positive_int,
-            default=1, dest='num_seg', help="Number of segments to compute. [1]")
+            default=1, dest='n_seg', help="Number of segments to compute. [1]")
 
     parser.add_argument('-s', '--n_spec', type=tools.type_positive_int, default=1,
-            dest='num_spectra', help="Number of energy spectra per QPO phase. "\
+            dest='n_spectra', help="Number of SED per QPO phase. "\
             "[1]")
 
     parser.add_argument('--n_par', type=tools.type_positive_int, default=1,
-            dest='num_params', help="Total number of spectral parameters per "\
-            "energy spectrum.")
+            dest='n_params', help="Total number of spectral parameters per "\
+            "SED.")
 
     parser.add_argument('-c', '--chan', type=tools.type_positive_int,
             default=64, dest='detchans', help="Number of detector energy "\
@@ -598,6 +754,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args.outroot, args.sinefitfile, args.prefix, args.n_bins, args.dt, \
-            args.num_seg, args.detchans, args.exposure, args.num_spectra, \
-            args.num_params, args.epoch, args.test, args.psd_flag)
+    main(args.outroot, args.funcfitfile, args.prefix, args.n_bins, args.dt, \
+            args.n_seg, args.detchans, args.exposure, args.n_spectra, \
+            args.n_params, args.epoch, args.test, args.psd_flag)
