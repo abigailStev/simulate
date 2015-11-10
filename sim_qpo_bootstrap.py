@@ -31,7 +31,7 @@ HEAINIT = ". " + HEADAS_DIR + "/headas-init.sh"
 TAB_EXT = "fits"
 PLOT_EXT = "eps"
 
-def main(prefix="PRE", dt_mult=64, n_seconds=64, boot_num=0, testing=False,
+def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=0, testing=False,
         day=datetime.now().strftime("%y%m%d")):
     """
     Main of sim_qpo_bootstrap.py python script.
@@ -39,13 +39,25 @@ def main(prefix="PRE", dt_mult=64, n_seconds=64, boot_num=0, testing=False,
     Parameters
     ----------
     prefix : str
-        The identifying prefix of the data (object nickname or data ID).
+        The identifying prefix of the data (object nickname or data ID). [--]
 
     dt_mult : float
+        Multiple of dt (dt is from data file) for timestep between bins.
+        Must be a power of 2, positive. [64]
+
     n_seconds : int
+        Number of seconds in each Fourier segment. Must be a power of 2,
+        positive. [64]
+
     boot_num : int
+        Number of bootstrap realizations to do/done. [0]
+
     testing : bool
+        If present, sets to True. Used for testing script so it'll only run one
+        segment. [False]
+
     day : str
+        Date of the analysis, in YYMMDD format. [default is today's date]
 
     Returns
     -------
@@ -100,6 +112,7 @@ def main(prefix="PRE", dt_mult=64, n_seconds=64, boot_num=0, testing=False,
 
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description=__doc__, epilog="For optional"\
             " arguments, default values are given in brackets at end of "\
             "description.")
@@ -107,18 +120,24 @@ if __name__ == "__main__":
     parser.add_argument("--prefix", default="GX339-BQPO", dest="prefix",
             help="Identifying prefix of data (object nickname or data ID). "\
             "[GX339-BQPO]")
+
     parser.add_argument("--dt_mult", default=64, dest="dt_mult",
-            type=tools.type_positive_int, help="Multiple of time res of data "\
-            "for DT binning. [64]")
+            type=tools.type_positive_int, help="Multiple of dt (dt is time "\
+            "resolution from data file) for timestep between bins. Must be a "\
+            "power of 2, positive, int. [64]")
+
     parser.add_argument("--nsec", default=64, dest="n_seconds",
-            type=tools.type_positive_int, help="Length of Fourier segments, "\
-            "in seconds. [64]")
+            type=tools.type_positive_int, help="Number of seconds in each "\
+            "Fourier segment. Must be a power of 2, positive, int. [64]")
+
     parser.add_argument("--testing", default=False, dest="test",
             action="store_true", help="If present, sets to True. Used for "\
             "testing script so it'll only run one segment. [False]")
+
     parser.add_argument("--day", default=datetime.now().strftime("%y%m%d"),
             dest="day", help="Date of the analysis, in YYMMDD format. "\
             "[%s]" % datetime.now().strftime("%y%m%d"))
+
     parser.add_argument("--boot", default=10, dest="boot_num", type=int,
             help="Number of bootstrap realizations done. [10]")
 
