@@ -5,6 +5,7 @@ multifit_plots.py in sed_fit_bootstrap.sh. Calls fake_qpo_spectra.py.
 Used in ccf_bootstrap.sh.
 """
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
+__year__ = "2015"
 
 import argparse
 import os.path
