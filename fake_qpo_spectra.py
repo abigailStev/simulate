@@ -1,3 +1,13 @@
+#!/usr/bin/env python
+
+"""
+Makes fake QPO energy-dependent light curves and does spectral-timing (power
+spectrum, ccf, and lag-energy spectra) from a set of SED parameters (either tied
+value of parameters of best-fit function to the parameter variation with QPO-
+phase), from energy_spectra/multifit_plots.py.
+
+WARNING: Location of 'simpler' XSPEC model is hardwired in.
+"""
 import numpy as np
 import subprocess
 import os
@@ -15,14 +25,6 @@ import tools
 
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
 __year__ = "2015"
-
-"""
-Makes legit fake QPO and does spectral-timing from a set of SED
-parameters (either tied value of parameters of best-fit function to the
-parameter variation with QPO-phase), from energy_spectra/multifit_plots.py.
-
-Location of 'simpler' XSPEC model and the PCU response matrix are hardwired in.
-"""
 
 class Parameter(object):
     """
@@ -171,7 +173,7 @@ def read_parameters(funcfit_file, n_spectra, n_params):
 
 
 ################################################################################
-def run_fakeit(parameters, model, exposure, n_spectra, out_root):
+def run_fakeit(parameters, model, exposure, n_spectra, out_root, rsp_matrix):
     """
     Makes fake SED for each part of the QPO phase with the HEAsoft FTOOL
     "fakeit".
@@ -199,8 +201,6 @@ def run_fakeit(parameters, model, exposure, n_spectra, out_root):
         The file names of the fake SEDs created.
     """
 
-    rsp_matrix = "GX339-BQPO_PCU2.rsp"
-    # rsp_matrix = "/Users/abigailstevens/Dropbox/Academic/Conferences_and_Talks/DC_talks/NICER_May2014_rbn.rsp"
     fake_spec_list = []
     current_dir = os.getcwd()
     # print "Current dir:", current_dir
@@ -236,14 +236,14 @@ def run_fakeit(parameters, model, exposure, n_spectra, out_root):
         # print "Script:", os.path.exists(fakeit_script)
 
         # p = subprocess.Popen("xspec %s" % (fakeit_script), shell=True)
-                ## Setting shell=True allows you to run non- standard shell
-                ## commands, and Popen lets us redirect the output
-
+            ## Setting shell=True allows you to run non- standard shell
+            ## commands, and Popen lets us redirect the output
         p = subprocess.Popen("xspec %s > %s" % (fakeit_script, "dump.txt"), \
                 shell=True)  ## Setting shell=True allows you to run non-
                 ## standard shell commands, and Popen lets us redirect the
                 ## output
         p.communicate()  ## Waits for the command to finish running.
+
 
         # print os.getcwd()
         # subprocess.call(["open", "dump.txt"])
@@ -496,8 +496,9 @@ def make_lagspectrum(out_root, prefix):
 
 
 ################################################################################
-def main(out_root, funcfit_file, prefix, n_bins, dt, n_seg, detchans,\
-        exposure, n_spectra, n_params, epoch, test, psd_flag):
+def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
+        n_seg=198, n_chans=64, exposure=13224.3984375, n_spectra=24, n_params=9,
+        epoch=5, rsp_matrix="PCU2.rsp", test=False, psd_flag=False):
     """
     Main of fake_qpo_spectra.py
 
@@ -512,36 +513,43 @@ def main(out_root, funcfit_file, prefix, n_bins, dt, n_seg, detchans,\
 
     prefix : str
         The identifying prefix of the data. Should have 'FAKE' in it for
-        simulated data.
+        simulated data. [GX339-BQPO]
 
     n_bins : int
-        Number of time bins in a segment of light curve.
+        Number of time bins in a segment of light curve. [8192]
 
     dt : float
-        Timestep between time bins.
+        Timestep between time bins. [0.0078125]
 
     n_seg : int
-        Number of segments to compute (i.e., length of light curve).
+        Number of segments to compute (i.e., length of light curve). [198]
+
+    n_chans : int
+        Number of effective energy channels for the detector's data mode. [64]
 
     exposure : float
-        The exposure time of the fake observation.
+        The exposure time of the fake observation. [13224.3984375]
 
     n_spectra : int
-        Number of phase-resolved SEDs per QPO phase.
+        Number of phase-resolved SEDs per QPO phase. [24]
 
     n_params : int
-        Total number of parameters in one SED.
+        Total number of parameters in one SED. [9]
 
     epoch : int
         RXTE observation epoch (affects the keV energy of the detector channels,
         which affects which ones we bin up for the reference band, and the
-        conversion from channel to keV for plotting).
+        conversion from channel to keV for plotting). [5]
+
+    rsp_matrix : str
+        The file name (local path) of the XSPEC response matrix. ["PCU2.rsp"]
 
     test : bool
-        If true, runs one segment for testing.
+        If true, runs one segment for testing. [False]
 
     psd_flag : bool
         If true, computes and prints the power spectral density of the fake QPO.
+        [False]
 
     Returns
     -------
@@ -561,7 +569,7 @@ def main(out_root, funcfit_file, prefix, n_bins, dt, n_seg, detchans,\
                  'df': df,
                  'nyquist': nyquist_freq,
                  'n_bins': n_bins,
-                 'detchans': detchans,
+                 'detchans': n_chans,
                  'adjust_seg': adjust_seg,
                  'n_seg': n_seg,
                  'obs_epoch': epoch,
@@ -577,21 +585,20 @@ def main(out_root, funcfit_file, prefix, n_bins, dt, n_seg, detchans,\
     #############################################
     ## Making fake SED for one period
     #############################################
-    print "Running fakeit"
     fake_spec_list = run_fakeit(parameters, model, meta_dict['exposure'], \
-            n_spectra, out_root)
-    print "finished fakeit"
+            n_spectra, out_root, rsp_matrix)
+
     spectra = np.zeros((n_spectra, meta_dict['detchans']))
 
     for (spec_file, n_spec) in zip(fake_spec_list, np.arange(n_spectra)):
 
         single_spectrum = simlc.read_fakeit_spectra(spec_file)
-        assert len(single_spectrum) == detchans, "ERROR: Channels of fake "\
+        assert len(single_spectrum) == n_chans, "ERROR: Channels of fake "\
                 "SED do not match the expected detector energy"\
                 " channels."
-        spectra[n_spec,:] = single_spectrum
+        spectra[n_spec, :] = single_spectrum
 
-    n_repeat = np.ceil(float(meta_dict['n_bins']+meta_dict['n_seg']) / \
+    n_repeat = np.ceil(float(meta_dict['n_bins'] + meta_dict['n_seg']) / \
             float(n_spectra))
     spectra = np.tile(spectra, (n_repeat, 1))
 
@@ -697,10 +704,7 @@ if __name__ == "__main__":
     ##############################################
 
     parser = argparse.ArgumentParser(usage="python fake_qpo_spectra.py outroot"\
-            " funcfitfile [OTHER ARGUMENTS]", \
-            description="Computes a fake QPO power spectrum, ccf, and lag-"\
-            "energy spectra given the parameters of the best-fit sine wave to "\
-            "the SED parameter variations with QPO phase.", \
+            " funcfitfile [OTHER ARGUMENTS]", description=__doc__, \
             epilog="For optional arguments, default values are given in "\
             "brackets at end of description.")
 
@@ -715,34 +719,38 @@ if __name__ == "__main__":
             " the simulation. Should start with 'FAKE'. [FAKE]")
 
     parser.add_argument('-n', '--n_bins', type=tools.type_power_of_two,
-            default=1, dest='n_bins', help="Number of time bins in each "\
-            "Fourier segment. Must be a power of 2, positive, integer. [1]")
+            default=8192, dest='n_bins', help="Number of time bins in each "\
+            "Fourier segment. Must be a power of 2, positive, integer. [8192]")
 
-    parser.add_argument('--dt', type=tools.type_positive_float, default=1, \
-            dest='dt', help="Timestep between bins, in seconds. [1]")
+    parser.add_argument('--dt', type=tools.type_positive_float, default=0.0078125,
+            dest='dt', help="Timestep between bins, in seconds. [0.0078125]")
 
     parser.add_argument('-g', '--n_seg', type=tools.type_positive_int,
-            default=1, dest='n_seg', help="Number of segments to compute. [1]")
+            default=198, dest='n_seg', help="Number of segments to compute. [198]")
 
-    parser.add_argument('-s', '--n_spec', type=tools.type_positive_int, default=1,
-            dest='n_spectra', help="Number of SED per QPO phase. "\
-            "[1]")
+    parser.add_argument('-s', '--n_spec', type=tools.type_positive_int,
+            default=24, dest='n_spectra', help="Number of SED per QPO phase. "\
+            "[24]")
 
-    parser.add_argument('--n_par', type=tools.type_positive_int, default=1,
+    parser.add_argument('--n_par', type=tools.type_positive_int, default=9,
             dest='n_params', help="Total number of spectral parameters per "\
-            "SED.")
+            "SED. [9]")
 
     parser.add_argument('-c', '--chan', type=tools.type_positive_int,
-            default=64, dest='detchans', help="Number of detector energy "\
+            default=64, dest='n_chans', help="Number of detector energy "\
             "channels for the data mode used for real data. [64]")
 
     parser.add_argument('-e', '--epoch', type=tools.type_positive_int, default=5,
             choices={1,2,3,4,5}, dest='epoch', help="RXTE observation epoch. "\
             "[5]")
 
-    parser.add_argument('-x', '--exposure', type=tools.type_positive_float, default=1, \
+    parser.add_argument('-x', '--exposure', type=tools.type_positive_float, default=13224.0, \
             dest='exposure', help="Exposure time of the simulated observation,"\
-            " in seconds. [1]")
+            " in seconds. [13224.0]")
+
+    parser.add_argument('--rsp', default="PCU2.rsp", dest='rsp_matrix',
+            help="The file name (local path) of the XSPEC response matrix. "\
+            "[./PCU2.rsp]")
 
     parser.add_argument('-t', '--test', type=int, default=0, choices={0,1},
             dest='test', help="Int flag: 0 if computing all segments, 1 if "\
@@ -754,6 +762,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main(args.outroot, args.funcfitfile, args.prefix, args.n_bins, args.dt, \
-            args.n_seg, args.detchans, args.exposure, args.n_spectra, \
-            args.n_params, args.epoch, args.test, args.psd_flag)
+    test = False
+    if args.test == 1:
+        test = True
+
+    main(args.outroot, args.funcfitfile, prefix=args.prefix, n_bins=args.n_bins, dt=args.dt, \
+            n_seg=args.n_seg, n_chans=args.n_chans, exposure=args.exposure, n_spectra=args.n_spectra, \
+            n_params=args.n_params, epoch=args.epoch, rsp_matrix=args.rsp_matrix, test=test, \
+            psd_flag=args.psd_flag)
