@@ -17,6 +17,7 @@ import tools
 import subprocess
 import fake_qpo_spectra
 from datetime import datetime
+from fake_qpo_spectra import chisquared_lagspectrum as lag_chisq
 
 HOME_DIR = os.path.expanduser("~")
 CCF_BASEDIR = HOME_DIR + "/Dropbox/Research/cross_correlation"
@@ -60,7 +61,7 @@ def plot_final_multifit(out_rootname="out.fits", parfit_file="sines.fits"):
 def plot_final_lagenergy(out_rootname="out.fits", parfit_file="sines.fits"):
     """
     Plots the lag-energy of this simulation with the data, and gives the
-    chisquared fit.
+    chisquared fit (from fake_qpo_spectra.chisquared_lagspectrum).
 
     Parameters
     ----------
