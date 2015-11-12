@@ -3,6 +3,10 @@
 Makes fake lag-energy spectra given the energy spectral parameters from
 multifit_plots.py in sed_fit_bootstrap.sh. Calls fake_qpo_spectra.py.
 Used in ccf_bootstrap.sh.
+
+Be sure that the directories point correctly for your setup.
+
+Example call:  python sim_qpo_bootstrap.py
 """
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
 __year__ = "2015"
@@ -29,10 +33,53 @@ DYLD_LIB_PATH = os.environ.get('DYLD_LIBRARY_PATH')
 HEADAS_DIR = os.environ.get('HEADAS')
 HEAINIT = ". " + HEADAS_DIR + "/headas-init.sh"
 
-TAB_EXT = "fits"
 PLOT_EXT = "eps"
 
-def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=0, testing=False,
+def plot_final_multifit(out_rootname="out.fits", parfit_file="sines.fits"):
+    """
+    Plots the SED parameter variations of the original run with the best-fit
+    function averaged over all the bootstrapped runs.
+
+    Parameters
+    ----------
+    out_rootname : str
+        Full path root name (directories plus base) of the output file. Used for
+        the data file and the plot file.
+
+    parfit_file : str
+        Full path name of the
+
+    Returns
+    -------
+    nothing
+    """
+    data_file = out_rootname + ".fits"
+    plot_file = out_rootname + "." + PLOT_EXT
+    print plot_file, parfit_file, data_file
+
+def plot_final_lagenergy(out_rootname="out.fits", parfit_file="sines.fits"):
+    """
+    Plots the lag-energy of this simulation with the data, and gives the
+    chisquared fit.
+
+    Parameters
+    ----------
+    out_rootname : str
+
+
+    parfit_file : str
+
+
+    Returns
+    -------
+    nothing
+    """
+    pass
+    # data_file = out_rootname + ".fits"
+    # plot_file = out_rootname + "." + PLOT_EXT
+    # print plot_file, parfit_file, data_file
+
+def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=2, testing=False,
         day=datetime.now().strftime("%y%m%d")):
     """
     Main of sim_qpo_bootstrap.py python script.
@@ -51,7 +98,8 @@ def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=0, testing=False,
         positive. [64]
 
     boot_num : int
-        Number of bootstrap realizations to do/done. [0]
+        Number of bootstrap realizations to do/done. Entering 0 means don't
+        bootstrap. [2]
 
     testing : bool
         If present, sets to True. Used for testing script so it'll only run one
@@ -111,6 +159,8 @@ def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=0, testing=False,
         print("\t ERROR: Parameter fit file does not exist: %s" % parfit_file)
         exit()
 
+    plot_final_lagenergy(out_rootname=out_rootname, parfit_file=parfit_file)
+
 
 if __name__ == "__main__":
 
@@ -139,8 +189,8 @@ if __name__ == "__main__":
             dest="day", help="Date of the analysis, in YYMMDD format. "\
             "[%s]" % datetime.now().strftime("%y%m%d"))
 
-    parser.add_argument("--boot", default=10, dest="boot_num", type=int,
-            help="Number of bootstrap realizations done. [10]")
+    parser.add_argument("--boot", default=2, dest="boot_num", type=int,
+            help="Number of bootstrap realizations done. [2]")
 
     args = parser.parse_args()
 
