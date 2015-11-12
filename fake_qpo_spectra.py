@@ -391,7 +391,8 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
 
     t_length = 100
     ccf = ccf[meta_dict['n_bins']/2-t_length:meta_dict['n_bins']/2+t_length].T
-    t_bins = time_bins[meta_dict['n_bins']/2-t_length:meta_dict['n_bins']/2+t_length]
+    t_bins = time_bins[meta_dict['n_bins']/2-t_length:meta_dict['n_bins']/2+\
+                                                      t_length]
     #
     # energies = np.loadtxt("/Users/abigailstevens/Dropbox/Academic/Conferences_and_Talks/DC_talks/NICER-energies.dat")
     # plot_file = out_root+"ccf_2D.eps"
@@ -677,14 +678,14 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     ## Making a power spectrum
     ###########################
     if psd_flag:
-        make_powerspectrum(power_array, mean_rate_array_1D, meta_dict, prefix, \
+        make_powerspectrum(power_array, mean_rate_array_1D, meta_dict, prefix,
                 out_root)
 
     #######################################
     ## Making a cross correlation function
     #######################################
 
-    make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
+    make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix,
             out_root)
 
     # print "place 2"
@@ -722,11 +723,13 @@ if __name__ == "__main__":
             default=8192, dest='n_bins', help="Number of time bins in each "\
             "Fourier segment. Must be a power of 2, positive, integer. [8192]")
 
-    parser.add_argument('--dt', type=tools.type_positive_float, default=0.0078125,
+    parser.add_argument('--dt', type=tools.type_positive_float,
+            default=0.0078125,
             dest='dt', help="Timestep between bins, in seconds. [0.0078125]")
 
     parser.add_argument('-g', '--n_seg', type=tools.type_positive_int,
-            default=198, dest='n_seg', help="Number of segments to compute. [198]")
+            default=198, dest='n_seg', help="Number of segments to compute. "\
+            "[198]")
 
     parser.add_argument('-s', '--n_spec', type=tools.type_positive_int,
             default=24, dest='n_spectra', help="Number of SED per QPO phase. "\
@@ -740,11 +743,13 @@ if __name__ == "__main__":
             default=64, dest='n_chans', help="Number of detector energy "\
             "channels for the data mode used for real data. [64]")
 
-    parser.add_argument('-e', '--epoch', type=tools.type_positive_int, default=5,
+    parser.add_argument('-e', '--epoch', type=tools.type_positive_int,
+            default=5,
             choices={1,2,3,4,5}, dest='epoch', help="RXTE observation epoch. "\
             "[5]")
 
-    parser.add_argument('-x', '--exposure', type=tools.type_positive_float, default=13224.0, \
+    parser.add_argument('-x', '--exposure', type=tools.type_positive_float,
+            default=13224.0, \
             dest='exposure', help="Exposure time of the simulated observation,"\
             " in seconds. [13224.0]")
 
@@ -766,7 +771,8 @@ if __name__ == "__main__":
     if args.test == 1:
         test = True
 
-    main(args.outroot, args.funcfitfile, prefix=args.prefix, n_bins=args.n_bins, dt=args.dt, \
-            n_seg=args.n_seg, n_chans=args.n_chans, exposure=args.exposure, n_spectra=args.n_spectra, \
-            n_params=args.n_params, epoch=args.epoch, rsp_matrix=args.rsp_matrix, test=test, \
-            psd_flag=args.psd_flag)
+    main(args.outroot, args.funcfitfile, prefix=args.prefix, n_bins=args.n_bins,
+            dt=args.dt, n_seg=args.n_seg, n_chans=args.n_chans,
+            exposure=args.exposure, n_spectra=args.n_spectra,
+            n_params=args.n_params, epoch=args.epoch,
+            rsp_matrix=args.rsp_matrix, test=test, psd_flag=args.psd_flag)
