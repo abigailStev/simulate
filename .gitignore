@@ -1,5 +1,6 @@
 # Sub-directories 
 spectra/*
+out_sim/*
 .idea/*
 .ipynb_checkpoints/*
 
