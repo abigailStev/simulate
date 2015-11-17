@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 Makes fake QPO energy-dependent light curves and does spectral-timing (power
 spectrum, ccf, and lag-energy spectra) from a set of SED parameters (either tied
@@ -7,6 +6,11 @@ value of parameters of best-fit function to the parameter variation with QPO-
 phase), from energy_spectra/multifit_plots.py.
 
 WARNING: Location of 'simpler' XSPEC model is hardwired in.
+
+Example call:
+    python fake_qpo_spectra.py ./cygx1_BBPL ./cygx1_BBPL_sines.txt \
+            --prefix cygx1 --rsp ./cygx1_PCU2.rsp
+
 """
 import numpy as np
 import subprocess
@@ -14,6 +18,10 @@ import os
 import warnings
 import argparse
 from astropy.io import fits
+
+## These are things I've written.
+## Their dirs are in my PYTHONPATH bash environment variable.
+
 import simulate_lightcurves as simlc
 import powerspec as psd
 import rebin_powerspec as rb_psd
@@ -21,7 +29,10 @@ import ccf as xcf
 import plot_ccf as p_xcf
 import plot_2d as p2D_xcf
 import get_lags as lags
-import tools
+import tools  ## in https://github.com/abigailStev/whizzy_scripts
+import ccf_lightcurves as ccf_lc  ## in https://github.com/abigailStev/
+                                  ## cross_correlation
+
 
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
 __year__ = "2015"
@@ -50,12 +61,13 @@ class Parameter(object):
 def fit_function(t, p):
     """
     Computing a function to fit to the SED parameter variations. This is exactly
-     the same as what's in energy_spectra/multifit_plots.py.
+    the same as what's in energy_spectra/multifit_plots.py.
 
     Parameters
     ----------
     t : np.array of floats
         1-D array of time steps for the fit function.
+
     p : np.array of floats
         1-D array of the function parameters.
 
@@ -326,10 +338,10 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
     cross_spec_array : np.array of complex numbers
         3-D array (size = n_bins x detchans x n_seg) of the cross spectrum.
 
-    ci : Lightcurve object
+    ci : ccf_lc.Lightcurves object
         Channel of interest.
 
-    ref : Lightcurve object
+    ref : ccf_lc.Lightcurves object
         Reference band.
 
     meta_dict : dict
@@ -467,10 +479,10 @@ def make_lagspectrum(out_root, prefix):
     Parameters
     ---------
 
-    out_root : string
+    out_root : str
         The root of the out_root, including full directory path.
 
-    prefix : string
+    prefix : str
         Identifying prefix of the simulated data (should start with 'FAKE').
 
     Returns
@@ -478,9 +490,13 @@ def make_lagspectrum(out_root, prefix):
     nothing
 
     """
-    in_file = out_root+"_cs.fits"
-    out_file = out_root+"_lag.fits"
-    lags.main(in_file, out_file, out_root, prefix, "eps", 4.0, 7.0, 3, 20)
+    in_file = out_root + "_cs.fits"
+    out_file = out_root + "_lag.fits"
+
+    energies_file = "/Users/abigailstevens/Reduced_data/GX339-BQPO/energies.txt"
+
+    lags.main(in_file, out_file, energies_file, out_root, prefix, "eps", 4.0, \
+            7.0, 3, 20)
     subprocess.call(["open", out_root + "_lag-energy.eps"])
 
     data_file = "/Users/abigailstevens/Dropbox/Research/lags/out_lags/GX339-"\
@@ -606,16 +622,18 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     #############################################
     ## Looping through the segments to do timing
     #############################################
-    ref = xcf.Lightcurve()
-    ci = xcf.Lightcurve()
+    ref = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
+            detchans=meta_dict['detchans'], type='ref')
+    ci = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
+            detchans=meta_dict['detchans'], type='ci')
     mean_rate_array_1D = 0
     power_array = np.zeros((meta_dict['n_bins'], 1))
     cross_spec_array = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
             1), dtype=np.complex128)
-    ref.power_array = np.zeros((meta_dict['n_bins'], 1))
-    ref.mean_rate_array = 0
-    ci.power_array = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], 1))
-    ci.mean_rate_array = np.zeros((meta_dict['detchans'], 1))
+    # ref.power_array = np.zeros((meta_dict['n_bins'], 1))
+    # ref.mean_rate_array = 0
+    # ci.power_array = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], 1))
+    # ci.mean_rate_array = np.zeros((meta_dict['detchans'], 1))
 
     # mean = 5.42089871724  ## Hz
     # std_dev = 0.352722903769
@@ -637,8 +655,8 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
         lightcurve_2D = spectra[segment:meta_dict['n_bins']+segment,:] / \
                 meta_dict['exposure']
         lightcurve_1D = np.sum(lightcurve_2D, axis=1)
-        lightcurve_ref = xcf.stack_reference_band(lightcurve_2D, \
-                meta_dict['obs_epoch'])
+        lightcurve_ref = xcf.stack_reference_band(lightcurve_2D,
+                instrument='PCA', obs_epoch=meta_dict['obs_epoch'])
 
         power_segment, mean_rate_segment = psd.make_ps(lightcurve_1D)
 
@@ -695,6 +713,8 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     ##################################################
 
     make_lagspectrum(out_root, prefix)
+
+    return
 
 
 ################################################################################
