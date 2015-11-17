@@ -260,7 +260,7 @@ def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=2, testing=False,
     """
     ccf_dir = CCF_BASEDIR + "/out_ccf/" + prefix
     es_dir = ES_BASEDIR + "/out_es/" + prefix + "/bootstrapped"
-    lag_dir = LAG_BASEDIR + "/out_lag/" + prefix
+    lag_dir = LAG_BASEDIR + "/out_lags/" + prefix
     out_dir = EXE_DIR + "/out_sim/" + prefix + "/bootstrapped"
     data_dir = DATA_BASEDIR + "/" + prefix
     rsp_matrix = prefix + "_PCU2.rsp"
