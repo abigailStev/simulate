@@ -1,0 +1,22 @@
+# Sub-directories 
+spectra/*
+.idea/*
+.ipynb_checkpoints/*
+
+# By-products
+*.pyc
+*.pyo
+
+# Images and plots
+*.png
+*.pdf
+*.eps
+
+# Data files
+*.dat
+*.lc
+*.pha
+*.rsp
+*.fits
+*.fak
+*.txt
