@@ -83,8 +83,20 @@ def power_spectra_things(mean_ps_ref, dt, n_bins, num_seconds, num_segments, \
 ################################################################################
 def determine_extra_bins(bpp):
     """
-	
-	"""
+	Determines the number of bins needed for the sine wave to have a whole
+	number of periods in a segment.
+
+	Parameters
+	----------
+	bpp : float
+	    The number of bins per period.
+
+	Returns
+	-------
+	int
+	    Number of bins needed to fit a whole number of periods.
+
+    """
     i = 1
     while np.abs(bpp * i - np.rint(bpp * i)) > 0.1 and \
             np.abs(bpp * i - np.rint(bpp * i)) < 0.9 and i < 100:
@@ -96,30 +108,51 @@ def determine_extra_bins(bpp):
 def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
                    phase):
     """
-	Creates two synthetic light curves with Poisson noise on sine wave signals 
-	of length n_bins. For the blackbody spectrum, 'phase_diff' is zero. For the 
-	power law spectrum, 'phase_diff' is non-zero.
-		
-	Passed: dt - The timestep or amount of time per bin, in seconds.
-			n_bins - Number of bins, the integer length of the light curve. 
-				Must be a power of two.
-			freq - Frequency of the sine wave signals, in Hz. Works well when 
-				this is a power of 2 (otherwise we get aliasing). We assume that 
-				the signals of both light curves have the same frequency.
-			amp_ci - Amplitude of the sine wave signal for ci. To simulate a 
-				noise-only process, set amp_ci = 0.
-			amp_ref - Amplitude of the sine wave signal for ref. To simulate a 
-				noise-only process, set amp_ref = 0.
-			mean_ci - Mean of the sine wave signal for ci.
-			mean_ref - Mean of the sine wave signal for ref.
-			phase - The phase shift for the power law variability, in 
-				radians?
+    Creates two synthetic light curves with Poisson noise on sine wave signals
+    of length n_bins. For the blackbody spectrum, 'phase_diff' is zero. For the
+    power law spectrum, 'phase_diff' is non-zero.
+
+    Parameters
+    ----------
+    dt : float
+        The timestep or amount of time per bin, in seconds.
+
+    n_bins : int
+        Number of bins, the integer length of the light curve. Must be a power
+        of two.
+
+	freq : float
+	    Frequency of the sine wave signals, in Hz. Works well when this is a
+	    power of 2 (otherwise we get aliasing). We assume that the signals of
+	    both light curves have the same frequency.
+
+    amp_ci : float
+        Amplitude of the sine wave signal for ci. To simulate a noise-only
+        process, set amp_ci = 0.
+
+    amp_ref : float
+        Amplitude of the sine wave signal for ref. To simulate a noise-only
+        process, set amp_ref = 0.
+
+    mean_ci - Mean of the sine wave signal for ci.
+
+    mean_ref - Mean of the sine wave signal for ref.
+
+    phase - The phase shift for the power law variability, in radians?
 	
-	Returns: sine_ci - Relative sine wave signal for ci of length n_bins.
-			 sine_ref - Relative sine wave signal for ref of length n_bins.
-			 extra_bins - 
-			 
-	"""
+    Returns
+    -------
+    np.array of floats
+        Relative sine wave signal for ci of length n_bins.
+
+	np.array of floats
+	    Relative sine wave signal for ref of length n_bins.
+
+    int
+	    Number of bins more than n_bins needed to contain a whole number of
+	    sine periods.
+
+    """
 
     ## Initializing new variables
     period = 1.0 / freq  # Period of sine waves, in seconds
@@ -159,31 +192,32 @@ def generate_sines(dt, n_bins, freq, amp_ci, amp_ref, mean_ci, mean_ref, \
 ################################################################################
 def read_fakeit_spectra(spec_file):
     """
-	Reads spectra (created by the HEAsoft FTOOL 'fakeit') from a text file.
-	
-    Parameters
-	----------
-	spec_file : string
-	    Filename of energy spectrum.
-	
-	Returns
-	-------
-	np.array of floats
-	    Value at each energy channel.
-	
-	"""
+    Reads spectra (created by the HEAsoft FTOOL 'fakeit') from a .fak (FITS) or
+    .dat (text) file.
 
-    print "Energy spectrum file: %s" % spec_file
-    if spec_file[-3:] == "dat":
+    Parameters
+    ----------
+    spec_file : string
+    Filename of energy spectrum.
+
+    Returns
+    -------
+    np.array of floats
+        Value at each energy channel.
+
+    """
+
+    # print "Energy spectrum file: %s" % spec_file
+    if spec_file[-3:].lower() == "dat":
         table = np.loadtxt(spec_file, dtype=float)
         spectrum = table[:, 1]
 
-    elif spec_file[-3:] == "fak":
+    elif spec_file[-3:].lower() == "fak":
         file_hdu = fits.open(spec_file)
         spectrum = file_hdu[1].data.field('COUNTS')
     else:
-        raise Exception("ERROR: Spectrum format not recognized. Must be a fits" \
-                        "file of type '.fak' or a text file of type '.dat'.")
+        raise Exception("ERROR: Spectrum format not recognized. Must be a FITS"\
+                "file of type '.fak' or a text file of type '.dat'.")
 
     return spectrum
 
@@ -237,16 +271,20 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 	Adds together the light curves from the blackbody and the power law, and 
 	adds Poisson noise to the light curve.
 	
-	Passed: curve_ci_bb - 
-			curve_ref_bb - 
-			curve_ci_pl - 
-			curve_ref_pl - 
-			dt - 
-			exposure -
-			noisy - 
+	Parameters
+	----------
+	curve_ci_bb -
+    curve_ref_bb -
+    curve_ci_pl -
+    curve_ref_pl -
+    dt -
+    exposure -
+    noisy -
 	
-	Returns: noisy_curve_ci - 
-			 noisy_curve_ref - 
+	Returns
+	-------
+	noisy_curve_ci -
+	noisy_curve_ref -
 	
 	"""
 
@@ -268,10 +306,12 @@ def add_lightcurves(curve_ci_bb, curve_ref_bb, curve_ci_pl, curve_ref_pl, dt, \
 ################################################################################
 def main(freq, bb_spec, pl_spec, num_seconds, dt_mult, mean_ci, mean_ref, \
          amp_ci, amp_ref, phase, exposure, test, noisy):
-    t_res = 1.0 / 8192.0  # The time resolution of the data, in seconds.
+
+    t_res = 1.0 / 8192.0  ## The time resolution of the data, in seconds.
     dt = dt_mult * t_res
     n_bins = num_seconds * int(1.0 / dt)
-    assert tools.power_of_two(n_bins)  # n_bins must be a power of 2 for the FFT
+    assert tools.power_of_two(n_bins), "ERROR: n_bins must be a power of 2 for"\
+            " the FFT."
 
     spec_bb = read_fakeit_spectra(bb_spec)
     spec_pl = read_fakeit_spectra(pl_spec)
