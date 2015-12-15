@@ -24,16 +24,15 @@ from astropy.io import fits
 
 ## These are things I've written.
 ## Their directories are in my PYTHONPATH bash environment variable.
-import simulate_lightcurves as simlc
-import powerspec as psd
-import rebin_powerspec as rb_psd
-import ccf as xcor
-import plot_ccf as p_xcor
-import plot_2d as p2D_xcor
-import get_lags as lags
-import tools  ## in https://github.com/abigailStev/whizzy_scripts
-import ccf_lightcurves as ccf_lc  ## in https://github.com/abigailStev/
-                                  ## cross_correlation
+import simulate_lightcurves as simlc  ## in simulate
+import powerspec as psd  ## in power_spectra
+import rebin_powerspec as rb_psd  ## in power_spectra
+import ccf as xcor  ## in cross_correlation
+import plot_ccf as p_xcor  ## in cross_correlation
+import plot_2d as p2D_xcor  ## in cross_correlation
+import get_lags as lags  ## in lag_spectra
+import tools  ## in whizzy_scripts
+import ccf_lightcurves as ccf_lc  ## in cross_correlation
 
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
 __year__ = "2015"
