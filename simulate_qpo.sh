@@ -5,7 +5,9 @@
 ## Bash script for making fake lag-energy spectra given the energy spectral
 ## parameters from multifit_plots.py in sed_fitting.sh
 ##
-## Example call: ./simulate_qpo_bootstrap.sh GX339-BQPO 64 64 0 150131
+## TODO: check the updates from 10 Dec, for file handling in ccf and psd
+##
+## Example call: ./simulate_qpo.sh GX339-BQPO 64 64 0 150131
 ##
 ## Change the directory names and specifiers before the double '#' row to best
 ## suit your setup.
@@ -13,14 +15,14 @@
 ## Notes: HEASOFT 6.11.*, bash 3.*, and Python 2.7.* (with supporting libraries)
 ## 		  must be installed in order to run this script.
 ##
-## Written by Abigail Stevens, A.L.Stevens at uva.nl, 2015
+## Written by Abigail Stevens <A.L.Stevens at uva.nl> 2015
 ##
 ################################################################################
 
 ## Checking the number of input arguments
 if (( $# != 6 )); then
-    echo -e "\tUsage: ./simulate_qpo_bootstrap.sh <prefix> <dt multiple> <num "\
-        "seconds> <testing> <date> <bootnum>\n"
+    echo -e "\tUsage: ./simulate_qpo.sh <prefix> <dt multiple> <num seconds> "\
+        "<testing> <date>\n"
     exit
 fi
 
@@ -29,7 +31,6 @@ dt_mult=$2
 numsec=$3
 testing=$4
 day=$5
-boot=$6
 
 ################################################################################
 
@@ -39,10 +40,10 @@ if (( $(echo $DYLD_LIBRARY_PATH | grep heasoft | wc -l) < 1 )); then
 fi
 
 home_dir=$(ls -d ~)
-ccf_dir="$home_dir/Dropbox/Research/cross_correlation/out_ccf/${prefix}/bootstrapped"
-es_dir="$home_dir/Dropbox/Research/energy_spectra/out_es/${prefix}/bootstrapped"
+ccf_dir="$home_dir/Dropbox/Research/cross_correlation/out_ccf/${prefix}"
+es_dir="$home_dir/Dropbox/Research/energy_spectra/out_es/${prefix}"
 exe_dir="$home_dir/Dropbox/Research/simulate"
-out_dir="$exe_dir/out_sim/${prefix}/bootstrapped"
+out_dir="$exe_dir/out_sim/${prefix}"
 data_dir="$home_dir/Reduced_data/$prefix"
 rsp_matrix="${prefix}_PCU2.rsp"
 dump_file=dump.txt # Name of dumping file for intermediary steps
@@ -64,7 +65,6 @@ ccf_file="$ccf_dir/${prefix}_${day}_t${dt_mult}_${numsec}sec_adj.fits"
 out_name="${prefix}_${day}_${fit_specifier}"
 out_root="${out_dir}/${out_name}"
 
-tab_ext="dat"
 plot_ext="eps"
 
 ################################################################################
