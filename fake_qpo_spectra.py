@@ -5,6 +5,9 @@ spectrum, ccf, and lag-energy spectra) from a set of SED parameters (either tied
 value of parameters of best-fit function to the parameter variation with QPO-
 phase), from energy_spectra/multifit_plots.py.
 
+Notes: HEASOFT 6.11.* and Python 2.7.* (with supporting libraries) must be
+installed in order to run this script.
+
 WARNING: Location of 'simpler' XSPEC model is hardwired in.
 
 Example call:
@@ -20,19 +23,17 @@ import argparse
 from astropy.io import fits
 
 ## These are things I've written.
-## Their dirs are in my PYTHONPATH bash environment variable.
-
+## Their directories are in my PYTHONPATH bash environment variable.
 import simulate_lightcurves as simlc
 import powerspec as psd
 import rebin_powerspec as rb_psd
-import ccf as xcf
-import plot_ccf as p_xcf
-import plot_2d as p2D_xcf
+import ccf as xcor
+import plot_ccf as p_xcor
+import plot_2d as p2D_xcor
 import get_lags as lags
 import tools  ## in https://github.com/abigailStev/whizzy_scripts
 import ccf_lightcurves as ccf_lc  ## in https://github.com/abigailStev/
                                   ## cross_correlation
-
 
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
 __year__ = "2015"
@@ -180,14 +181,14 @@ def read_parameters(funcfit_file, n_spectra, n_params):
             component.value = average_of_parameter(component.value)
             # print component.value
 
-    print("Model: %s" % model[0])
+    print("SED model: %s" % model[0])
     return parameters, model[0]
 
 
 ################################################################################
 def run_fakeit(parameters, model, exposure, n_spectra, out_root, rsp_matrix):
     """
-    Makes fake SED for each part of the QPO phase with the HEAsoft FTOOL
+    Makes fake SED for each time bin of the QPO phase with the HEAsoft FTOOL
     "fakeit".
 
     Parameters
@@ -209,7 +210,7 @@ def run_fakeit(parameters, model, exposure, n_spectra, out_root, rsp_matrix):
 
     Returns
     -------
-    list of strings
+    fake_spec_list : list of strings
         The file names of the fake SEDs created.
     """
 
@@ -276,7 +277,7 @@ def run_fakeit(parameters, model, exposure, n_spectra, out_root, rsp_matrix):
 
 
 ################################################################################
-def make_powerspectrum(power_array, mean_rate_array, meta_dict, prefix, \
+def make_powerspectrum(power_array, mean_rate_array, meta_dict, prefix,
         out_root):
     """
     Makes a power spectrum of the simulated data and plots it.
@@ -302,33 +303,41 @@ def make_powerspectrum(power_array, mean_rate_array, meta_dict, prefix, \
     -------
     nothing
 
+    Files created
+    -------------
+    *_psd.fits :
+        Data file of the segment-averaged power spectrum (PSD) of all the data.
+
+    *_psd_rb.eps :
+        Plot of the geometrically re-binned averaged power spectrum.
+
     """
     # print np.shape(power_array)
     mean_rate = np.mean(mean_rate_array)
-    power = xcf.seg_average(power_array)
+    power = np.mean(power_array, axis=-1)
 
-    out_file = out_root+"_psd.fits"
-    plot_file = out_root+"_psd_rb.eps"
+    out_file = out_root + "_psd.fits"
+    plot_file = out_root + "_psd_rb.eps"
 
-    freq, power, leahy_power, fracrms_power, fracrms_err = psd.normalize(power,\
+    freq, power, leahy_power, fracrms_power, fracrms_err = psd.normalize(power,
             meta_dict, mean_rate, False)
 
-    psd.fits_out(out_file, prefix, meta_dict, mean_rate, freq, fracrms_power, \
-            fracrms_err, leahy_power)
+    psd.fits_out(out_file, prefix, meta_dict, mean_rate, freq, fracrms_power,
+            fracrms_err, leahy_power, "Simulated PSD")
 
     rebin_const = 1.01
 
     rb_freq, rb_power, rb_err, freq_min, freq_max = rb_psd.geometric_rebinning(\
             freq, fracrms_power, fracrms_err, rebin_const)
 
-    rb_psd.plot_rb(plot_file, rebin_const, prefix, rb_freq, rb_freq*rb_power, \
+    rb_psd.plot_rb(plot_file, rebin_const, prefix, rb_freq, rb_freq*rb_power,
             rb_freq*rb_err)
 
     subprocess.call(["open", plot_file])
 
 
 ################################################################################
-def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
+def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix,
         out_root):
     """
     Makes the ccf of the simulated data and plots it.
@@ -338,10 +347,10 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
     cross_spec_array : np.array of complex numbers
         3-D array (size = n_bins x detchans x n_seg) of the cross spectrum.
 
-    ci : ccf_lc.Lightcurves object
+    ci : ccf_lc.Lightcurve object
         Channel of interest.
 
-    ref : ccf_lc.Lightcurves object
+    ref : ccf_lc.Lightcurve object
         Reference band.
 
     meta_dict : dict
@@ -357,60 +366,88 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix, \
     -------
     nothing
 
+    Files created
+    -------------
+    *_ccf.fits :
+        Data file of the segment-averaged cross-correlation function.
+
+    *_ccf.eps :
+        Plot of the CCF in energy channel 15.
+
+    *_ccf_2D.eps :
+        Plot of the 2-dimensional CCF.
+
     """
-    ref.mean_rate = xcf.seg_average(ref.mean_rate_array)[0]
-    ref.power = xcf.seg_average(ref.power_array)
-    ci.power = xcf.seg_average(ci.power_array)
-    # print np.shape(ci.power)
-    ci.mean_rate = xcf.seg_average(ci.mean_rate_array)
-    # print np.shape(ci.mean_rate)
-    cross_spec = xcf.seg_average(cross_spec_array)
 
-    out_file = out_root+".fits"
-    xcf.save_for_lags(out_file, prefix, meta_dict, ci.mean_rate,
-        ref.mean_rate, cross_spec, ci.power, ref.power)
+    ci.mean_rate /= np.float(meta_dict['n_seg'])
+    ci.power /= np.float(meta_dict['n_seg'])
+    ref.power /= np.float(meta_dict['n_seg'])
+    ref.mean_rate /= np.float(meta_dict['n_seg'])
+    avg_cross_spec = np.mean(cross_spec_array, axis=-1)
+    ci.pos_power = ci.power[0:meta_dict['n_bins']/2+1, :]
+    ref.pos_power = ref.power[0:meta_dict['n_bins']/2+1]
 
-    out_file = out_root+"_ccf.fits"
-    plot_file = out_root+"_ccf.eps"
-    t = np.arange(0, meta_dict['n_bins'])
+    ## Compute the variance and rms of the absolute-rms-normalized reference
+    ## band power spectrum. Remember that this has no Poisson noise!
+    absrms_ref_pow = xcor.raw_to_absrms(ref.pos_power, ref.mean_rate,
+            meta_dict['n_bins'], meta_dict['dt'], noisy=False)
+
+    ref.var, ref.rms = xcor.var_and_rms(absrms_ref_pow, meta_dict['df'])
+
+    ## Save the cross spectrum and power spectra to compute lags
+    out_file = out_root + ".fits"
+    xcor.save_for_lags(out_file, prefix, meta_dict, avg_cross_spec, ci, ref)
+
+    ## Make ccf output file names
+    out_file = out_root + "_ccf.fits"
+    plot_file = out_root + "_ccf.eps"
 
     meta_dict['dt'] = np.repeat(meta_dict['dt'], meta_dict['n_seg'])
 
-    ccf = xcf.UNFILT_cs_to_ccf(cross_spec, meta_dict, ref, False)
-    ccf_error = xcf.standard_ccf_err(cross_spec_array, meta_dict, ref, False)
+    ## Compute average ccf and error on average ccf
+    ccf_avg, ccf_error = xcor.unfilt_cs_to_ccf_w_err(cross_spec_array,
+            meta_dict, ref)
 
-    xcf.fits_out(out_file, prefix, "None", meta_dict, ci.mean_rate, \
-        ref.mean_rate, t, ccf, ccf_error, False, -1, -1)
+    ## Save ccf to a fits file
+    print "Rms float:", float(ref.rms)
+    print "Rms:", ref.rms
+    print type(ref.rms)
+    xcor.fits_out(out_file, prefix, " ", meta_dict, ci.mean_rate, ref.mean_rate,
+            float(ref.rms), ccf_avg, ccf_error, -1, -1, "Simulated CCF")
 
+    ## Make a 1-D ccf plot for energy channel 15
     time_bins = np.arange(meta_dict['n_bins'])
-    pos_time_bins = time_bins[0:meta_dict['n_bins']/2]
-    neg_time_bins = time_bins[meta_dict['n_bins']/2:] - meta_dict['n_bins']
+    half = meta_dict['n_bins']/2
+    pos_time_bins = time_bins[0:half]
+    neg_time_bins = time_bins[half:] - meta_dict['n_bins']
     time_bins = np.append(neg_time_bins, pos_time_bins)
-
-    # print np.shape(ccf)
-    ccf_15 = ccf[:,15]
-    pos_time_ccf = ccf_15[0:meta_dict['n_bins']/2]
-    neg_time_ccf = ccf_15[meta_dict['n_bins']/2:]
+    ccf_15 = ccf_avg[:,15]
+    pos_time_ccf = ccf_15[0:half]
+    neg_time_ccf = ccf_15[half:]
     ccf_15 = np.append(neg_time_ccf, pos_time_ccf)
-
     ccf_error = ccf_error[:,15]
-    pos_time_ccf_err = ccf_error[0:meta_dict['n_bins']/2]
-    neg_time_ccf_err = ccf_error[meta_dict['n_bins']/2:]
+    pos_time_ccf_err = ccf_error[0:half]
+    neg_time_ccf_err = ccf_error[half:]
     ccf_err = np.append(neg_time_ccf_err, pos_time_ccf_err)
 
-    p_xcf.make_plot(time_bins, ccf_15, ccf_err, meta_dict['n_bins'], prefix, \
-            plot_file, 15, 128)
+    p_xcor.make_plot(time_bins, ccf_15, ccf_err, meta_dict['n_bins'], prefix,
+            plot_file, 15, int(1.0 / np.mean(meta_dict['dt'])))
 
-    t_length = 100
-    ccf = ccf[meta_dict['n_bins']/2-t_length:meta_dict['n_bins']/2+t_length].T
-    t_bins = time_bins[meta_dict['n_bins']/2-t_length:meta_dict['n_bins']/2+\
-                                                      t_length]
-    #
+    ## Make a 2-D ccf plot
+    t_length = 30
+    ccf = ccf_avg[half - t_length:half + t_length + 1, :].T
+    t_bins = time_bins[half - t_length:half + t_length + 1]
     # energies = np.loadtxt("/Users/abigailstevens/Dropbox/Academic/Conferences_and_Talks/DC_talks/NICER-energies.dat")
-    # plot_file = out_root+"ccf_2D.eps"
-    # p2D_xcf.make_plot(ccf, t_bins, ci.mean_rate, t_length, 128, plot_file, energies)
+    energies = np.loadtxt("/Users/abigailstevens/Reduced_data/" + prefix +
+            "/energies.txt")
+    plot_file = out_root + "ccf_2D.eps"
 
-    # subprocess.call(["open", plot_file])
+    print np.shape(ccf)
+    print np.shape(t_bins)
+    p2D_xcor.make_plot(ccf, t_bins, ci.mean_rate, t_length,
+            int(1.0 / np.mean(meta_dict['dt'])), plot_file, energies)
+
+    subprocess.call(["open", plot_file])
 
 
 ################################################################################
@@ -431,9 +468,13 @@ def chisquared_lagspectrum(data_file, sim_file):
 
     Returns
     -------
-    float
+    chisquared : float
         The chisquared fit statistic of the simulation's lag-energy spectrum
         with the data's lag-energy spectrum.
+
+    dof : float
+        The relevant degrees of freedom (number of data points + number of
+        simulation data points).
 
     """
 
@@ -499,8 +540,8 @@ def make_lagspectrum(out_root, prefix):
             7.0, 3, 20)
     subprocess.call(["open", out_root + "_lag-energy.eps"])
 
-    data_file = "/Users/abigailstevens/Dropbox/Research/lags/out_lags/GX339-"\
-            "BQPO/GX339-BQPO_150902_t64_64sec_adj_lag.fits"
+    data_file = "/Users/abigailstevens/Dropbox/Research/lag_spectra/out_lags/"\
+            "GX339-BQPO/GX339-BQPO_151204_t64_64sec_adj_lag.fits"
 
     chisquared, dof = chisquared_lagspectrum(data_file, out_file)
     print chisquared, dof
@@ -574,7 +615,7 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     """
 
     if test:
-        n_seg = 1
+        n_seg = 10
 
     adjust_seg = 0  ## No need to adjust perfectly simulated data.
     n_seconds = n_bins * dt
@@ -590,7 +631,8 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
                  'adjust_seg': adjust_seg,
                  'n_seg': n_seg,
                  'obs_epoch': epoch,
-                 'exposure': exposure}
+                 'exposure': exposure,
+                 'filter': False}
     # print(meta_dict)
     print_seg = 20
 
@@ -622,18 +664,14 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     #############################################
     ## Looping through the segments to do timing
     #############################################
-    ref = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
+    ref = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ref')
-    ci = ccf_lc.Lightcurves(n_bins=meta_dict['n_bins'],
+    ci = ccf_lc.Lightcurve(n_bins=meta_dict['n_bins'],
             detchans=meta_dict['detchans'], type='ci')
     mean_rate_array_1D = 0
     power_array = np.zeros((meta_dict['n_bins'], 1))
     cross_spec_array = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], \
             1), dtype=np.complex128)
-    # ref.power_array = np.zeros((meta_dict['n_bins'], 1))
-    # ref.mean_rate_array = 0
-    # ci.power_array = np.zeros((meta_dict['n_bins'], meta_dict['detchans'], 1))
-    # ci.mean_rate_array = np.zeros((meta_dict['detchans'], 1))
 
     # mean = 5.42089871724  ## Hz
     # std_dev = 0.352722903769
@@ -655,39 +693,66 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
         lightcurve_2D = spectra[segment:meta_dict['n_bins']+segment,:] / \
                 meta_dict['exposure']
         lightcurve_1D = np.sum(lightcurve_2D, axis=1)
-        lightcurve_ref = xcf.stack_reference_band(lightcurve_2D,
+        lightcurve_ref = xcor.stack_reference_band(lightcurve_2D,
                 instrument='PCA', obs_epoch=meta_dict['obs_epoch'])
 
         power_segment, mean_rate_segment = psd.make_ps(lightcurve_1D)
 
-        cs_seg, ci_seg, ref_seg = xcf.make_cs(lightcurve_2D, lightcurve_ref, \
+        cs_seg, ci_seg, ref_seg = xcor.make_cs(lightcurve_2D, lightcurve_ref, \
                 meta_dict)
 
         ## Adding this segment to the total arrays
         power_array = np.hstack((power_array, np.reshape(power_segment,
                 (meta_dict['n_bins'], 1)) ))
         mean_rate_array_1D = np.vstack((mean_rate_array_1D, mean_rate_segment))
-        # print "Mean count rate per segment:", mean_rate_segment
+        # # print "Mean count rate per segment:", mean_rate_segment
+        # cross_spec_array = np.dstack((cross_spec_array, cs_seg))
+        # ci.power_array = np.dstack((ci.power_array, np.reshape(ci_seg.power, \
+        #         (meta_dict['n_bins'], meta_dict['detchans'], 1)) ))
+        # ref.power_array = np.hstack((ref.power_array, np.reshape(ref_seg.power,
+        #         (meta_dict['n_bins'], 1)) ))
+        # ci.mean_rate_array = np.hstack((ci.mean_rate_array,
+        #         np.reshape(ci_seg.mean_rate, (meta_dict['detchans'], 1)) ))
+        # ref.mean_rate_array = np.vstack((ref.mean_rate_array, \
+        #         ref_seg.mean_rate))
+
+        ## Compute the variance and rms of each segment's reference band power
+        ## spectrum. Remember that there's no Poisson noise, so noisy=False!
+        absrms_pow = xcor.raw_to_absrms(ref_seg.power[0:meta_dict['n_bins'] \
+                / 2 + 1], ref_seg.mean_rate, meta_dict['n_bins'],
+                meta_dict['dt'], noisy=False)
+
+        var, rms = xcor.var_and_rms(absrms_pow, meta_dict['df'])
+
+        ## Append segment to arrays
         cross_spec_array = np.dstack((cross_spec_array, cs_seg))
-        ci.power_array = np.dstack((ci.power_array, np.reshape(ci_seg.power, \
-                (meta_dict['n_bins'], meta_dict['detchans'], 1)) ))
-        ref.power_array = np.hstack((ref.power_array, np.reshape(ref_seg.power,
-                (meta_dict['n_bins'], 1)) ))
         ci.mean_rate_array = np.hstack((ci.mean_rate_array,
-                np.reshape(ci_seg.mean_rate, (meta_dict['detchans'], 1)) ))
-        ref.mean_rate_array = np.vstack((ref.mean_rate_array, \
-                ref_seg.mean_rate))
+                np.reshape(ci_seg.mean_rate, (meta_dict['detchans'],
+                1))))
+        ref.power_array = np.hstack((ref.power_array,
+                np.reshape(ref_seg.power, (meta_dict['n_bins'], 1))))
+        ref.mean_rate_array = np.append(ref.mean_rate_array,
+                ref_seg.mean_rate)
+        ref.var_array = np.append(ref.var_array, var)
+
+        ## Sum across segments -- arrays, so it adds by index
+        ci.mean_rate += ci_seg.mean_rate
+        ref.mean_rate += ref_seg.mean_rate
+        ci.power += ci_seg.power
+        ref.power += ref_seg.power
 
     print("Number of segments computed: %d" % n_seg)
 
     ## Cutting off the initializing zeros
     mean_rate_array_1D = mean_rate_array_1D[1:]
     power_array = power_array[:,1:]
+    cross_spec_array = cross_spec_array[:,:,1:]
+    ci.mean_rate_array = ci.mean_rate_array[:,1:]
     ref.power_array = ref.power_array[:,1:]
     ref.mean_rate_array = ref.mean_rate_array[1:]
-    ci.power_array = ci.power_array[:,:,1:]
-    ci.mean_rate_array = ci.mean_rate_array[:,1:]
-    cross_spec_array = cross_spec_array[:,:,1:]
+    ref.var_array = ref.var_array[1:]
+
+    print ref.var_array
 
     # print mean_rate_array_1D[1:4]
     # print ref.mean_rate_array[1:4]
@@ -706,15 +771,11 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix,
             out_root)
 
-    # print "place 2"
-
     ##################################################
     ## Making a lag-energy and lag_frequency spectrum
     ##################################################
 
     make_lagspectrum(out_root, prefix)
-
-    return
 
 
 ################################################################################
