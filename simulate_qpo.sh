@@ -48,11 +48,11 @@ data_dir="$home_dir/Reduced_data/$prefix"
 rsp_matrix="${prefix}_PCU2.rsp"
 dump_file=dump.txt # Name of dumping file for intermediary steps
 
-#fit_specifier="1BB-Nicer"
+fit_specifier="1BB-FS-G"
 #fit_specifier="1BB-FS-G-Tin-fzs-fzNbb"
 #fit_specifier="2BB-FS-G-kT"
-#n_spectra=24
-#n_params=9
+n_spectra=24
+n_params=9
 #echo Fit specifier: "$fit_specifier"
 #echo "$n_spectra"
 #echo "$n_params"
