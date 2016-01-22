@@ -45,9 +45,15 @@ DUMP_FILE = "dump.txt"  # Name of dumping file for intermediary steps
 
 ## Gets these from 'source'/'export' in sed_fit_bootstrap.sh; if nothing,
 ## uses the default value (the second argument).
-N_PARAMS = int(os.getenv('n_params', 9))
 N_SPECTRA = int(os.getenv('n_spectra', 24))
-FIT_SPECIFIER = os.getenv('fit_specifier', "1BB-FS-G-Tin-fzs-fzNbb")
+# N_PARAMS = int(os.getenv('n_params', 9))
+# FIT_SPECIFIER = os.getenv('fit_specifier', "1BB-FS-G-Tin-fzs-fzNbb")
+N_PARAMS = int(os.getenv('n_params', 11))
+FIT_SPECIFIER = os.getenv('fit_specifier', "2BB-FS-G-kT-fzs-fzNbb8857")
+
+print "Fit specifier: %s" % FIT_SPECIFIER
+print "Number of spectra: %d" % N_SPECTRA
+print "Number of parameters: %d" % N_PARAMS
 
 ## Gets HEASOFT directory name and script name
 DYLD_LIB_PATH = os.environ.get('DYLD_LIBRARY_PATH')
@@ -61,7 +67,7 @@ PLOT_EXT = "eps"
 
 
 ################################################################################
-def plot_final_multifit(var_pars, out_rootname="out"):
+def plot_final_multifit(var_pars, out_rootname="out", title=" "):
     """
     Plot the SED parameter variations averaged over all the bootstrapped runs.
     The error on the parameters and the function come from the bootstrap-to-
@@ -83,13 +89,14 @@ def plot_final_multifit(var_pars, out_rootname="out"):
     print "Var par shape:", np.shape(var_pars)
     plot_file = out_rootname + "." + PLOT_EXT
 
-    multifit_plots.make_var_plots(plot_file, N_SPECTRA, var_pars, quiet=False)
+    multifit_plots.make_var_plots(plot_file, N_SPECTRA, var_pars, quiet=False,
+            title=title)
     subprocess.call(['cp', plot_file,
           "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
 
 
 ################################################################################
-def plot_final_lagenergy(lag_data_file, out_rootname="out"):
+def plot_final_lagenergy(lag_data_file, out_rootname="out", mod=" "):
     """
     Plot the lag-energy of this simulation (generated from the average of the
     bootstraps) with the data, and gives the chisquared/dof fit.
@@ -120,19 +127,31 @@ def plot_final_lagenergy(lag_data_file, out_rootname="out"):
     """
 
     in_file_list = [lag_data_file, out_rootname + "_lag.fits"]
-    labels = ["Data", "Bootstrap avg"]
+    labels = ["Data", r"%s" % mod]
     overplot_lags.make_plot(in_file_list, labels, out_rootname)
     chisquared, dof = lag_chisq(lag_data_file, out_rootname + "_lag.fits")
     print "\n\tLag-energy fit: %.5f / %d" % (chisquared, dof)
 
 
 ################################################################################
-def plot_deltaphase_hist(phase_points, out_rootname="out"):
+def plot_deltaphase_hist(phase_points, out_rootname="out", title=" "):
     """
+    Plot histograms of the delta phase for param 0 and param 2 wrt param 1.
 
-    :param phase_points:
-    :param out_rootname:
-    :return:
+    Parameters
+    ----------
+    phase_points : np.array of floats
+        2-D array of the phase of each parameter from each bootstrap.
+        Size = (number of varying parameters, number of bootstraps).
+
+    out_rootname : str
+        The dirname+basename of the output file, to be appended to for saving
+        the plot file.
+
+    Returns
+    -------
+    Nothing, but writes to file *_dphase_hist.PLOT_EXT
+
     """
     xLocator = MultipleLocator(0.02)  ## loc of minor ticks on x-axis
     font_prop = font_manager.FontProperties(size=20)
@@ -148,16 +167,20 @@ def plot_deltaphase_hist(phase_points, out_rootname="out"):
     # hist_2, edges_2 = np.histogram(delta_phase_2, bins=50, range=(0, 1))
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
-    bins_1, edges_1, patches_1 = ax.hist(delta_phase_1, bins=100, range=[0, 1])
-    bins_2, edges_2, patches_2 = ax.hist(delta_phase_2, bins=100, range=[0, 1])
+    bins_1, edges_1, patches_1 = ax.hist(delta_phase_1, bins=100, range=[0, 1],
+            facecolor='red')
+    bins_2, edges_2, patches_2 = ax.hist(delta_phase_2, bins=100, range=[0, 1],
+            facecolor='blue')
     ax.set_xlabel(r'$\Delta$ Normalized parameter phase',
             fontproperties=font_prop)
     ax.set_ylabel('Bootstrap iterations', fontproperties=font_prop)
-    ax.set_xlim(0, 0.45)
-    ax.set_xticks(np.arange(0, 0.45, 0.1))
+    ax.set_xlim(0, 0.41)
+    ax.set_ylim(0, 3500)
+    ax.set_xticks(np.arange(0, 0.41, 0.1))
     ax.xaxis.set_minor_locator(xLocator)
     ax.tick_params(axis='x', labelsize=18)
     ax.tick_params(axis='y', labelsize=18)
+    ax.set_title(r'%s' % title, fontproperties=font_prop)
 
     plt.savefig(plot_file)
     plt.close()
@@ -168,13 +191,24 @@ def plot_deltaphase_hist(phase_points, out_rootname="out"):
 
 
 ################################################################################
-def plot_phase_contours(phase_points, avg_var_pars, out_rootname="out"):
+def plot_phase_contours(phase_points, avg_var_pars, out_rootname="out", title=" "):
     """
+    Make a contour plot (currently just a scatter plot) of the phases of two
+    parameters from each bootstrap.
 
-    :param phase_points:
-    :param avg_var_pars:
-    :param out_rootname:
-    :return:
+    Parameters
+    ----------
+    phase_points : np.array of floats
+        2-D array of the phase of each parameter from each bootstrap.
+        Size = (number of varying parameters, number of bootstraps).
+
+    avg_var_pars : np.array or list of str
+        1-D array of the names of the varying parameters.
+
+    out_rootname : str
+        The dirname+basename of the output file, to be appended to for saving
+        the plot file.
+
     """
     xLocator = MultipleLocator(0.02)  ## loc of minor ticks on x-axis
     font_prop = font_manager.FontProperties(size=20)
@@ -230,6 +264,7 @@ def plot_phase_contours(phase_points, avg_var_pars, out_rootname="out"):
     ax.yaxis.set_minor_locator(xLocator)
     ax.tick_params(axis='x', labelsize=18)
     ax.tick_params(axis='y', labelsize=18)
+    ax.set_title(r'%s' % title, fontproperties=font_prop)
     plt.savefig(plot_file)
     plt.close()
     print("Plot saved to: %s" % plot_file)
@@ -242,8 +277,8 @@ def plot_phase_contours(phase_points, avg_var_pars, out_rootname="out"):
     y = phase_points[2,:]
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
     ax.scatter(x, y, color='black')
-    ax.plot(np.mean(x), np.mean(y), '*',
-            mfc='white', mew=1, mec='yellow', ms=10)
+    ax.plot(np.mean(x), np.mean(y), '*', mfc='white', mew=1, mec='yellow',
+            ms=10)
     ax.set_xlabel(r"Normalized phase: %s" % avg_var_pars[0],
             fontproperties=font_prop)
     ax.set_ylabel(r"Normalized phase: %s" % avg_var_pars[2],
@@ -254,6 +289,7 @@ def plot_phase_contours(phase_points, avg_var_pars, out_rootname="out"):
     ax.yaxis.set_minor_locator(xLocator)
     ax.tick_params(axis='x', labelsize=18)
     ax.tick_params(axis='y', labelsize=18)
+    ax.set_title(r'%s' % title, fontproperties=font_prop)
     plt.savefig(plot_file)
     plt.close()
     print("Plot saved to: %s" % plot_file)
@@ -266,8 +302,8 @@ def plot_phase_contours(phase_points, avg_var_pars, out_rootname="out"):
     y = phase_points[2,:]
     fig, ax = plt.subplots(1, 1, figsize=(10, 7.5), dpi=300, tight_layout=True)
     ax.scatter(x, y, color='black')
-    ax.plot(np.mean(x), np.mean(y), '*',
-            mfc='white', mew=1, mec='yellow', ms=10)
+    ax.plot(np.mean(x), np.mean(y), '*', mfc='white', mew=1, mec='yellow',
+            ms=10)
     ax.set_xlabel(r"Normalized phase: %s" % avg_var_pars[1],
             fontproperties=font_prop)
     ax.set_ylabel(r"Normalized phase: %s" % avg_var_pars[2],
@@ -278,12 +314,13 @@ def plot_phase_contours(phase_points, avg_var_pars, out_rootname="out"):
     ax.yaxis.set_minor_locator(xLocator)
     ax.tick_params(axis='x', labelsize=18)
     ax.tick_params(axis='y', labelsize=18)
+    ax.set_title(r'%s' % title, fontproperties=font_prop)
     plt.savefig(plot_file)
     plt.close()
     print("Plot saved to: %s" % plot_file)
     subprocess.call(['open', plot_file])
     subprocess.call(['cp', plot_file,
-          "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
+            "/Users/abigailstevens/Dropbox/Research/CCF_paper1/"])
 
 
 ################################################################################
@@ -350,7 +387,7 @@ def avg_boot_var_pars(var_pars, boot_num=2):
 
 
 ################################################################################
-def read_all_log_files(es_dir, out_rel_name, boot_num=2):
+def read_xspec_log_files(es_dir, out_rel_name, boot_num=2):
     """
     Read in all XSPEC log files (with chatter set to 4) that were generated in
     sed_fit_bootstrap.sh, and append each bootstrap iteration's values to its
@@ -374,108 +411,115 @@ def read_all_log_files(es_dir, out_rel_name, boot_num=2):
         2-D array of the SED parameters that vary with QPO phase, over
         all the bootstrap iterations.
     """
-    sed_parameters = np.tile(sed_pars.Parameter(), N_PARAMS)
-    var_pars = []
+    all_parameters = np.tile(sed_pars.Parameter(), N_PARAMS)
+    untied = []
     for i in range(1, boot_num + 1):
+    # for i in range(1, 10):
         log_file = es_dir + "/" + out_rel_name + "_b-" + str(i) + "_xspec.log"
         # print log_file
+        if os.path.isfile(log_file):
+            boot_sed_parameters, n_spec_log = multifit_plots.read_log_file(log_file,
+                    quiet=True)
+            assert n_spec_log == N_SPECTRA
+            boot_var_par = []
+            for component in boot_sed_parameters:
+                # print component.mod_name, component.par_name
+                if len(component.value) > 1:
+                    if component.value[0] != component.value[1] or \
+                            component.value[7] != component.value[0]:
+                        component.varying = True
+                        boot_var_par.append(component)
 
-        boot_sed_parameters, n_spec_log = multifit_plots.read_log_file(log_file,
-                quiet=True)
-        assert n_spec_log == N_SPECTRA
-        boot_var_par = multifit_plots.determine_varying_parameters(boot_sed_parameters,
-                n_spectra=N_SPECTRA, quiet=True)
-        # print "Number of varying parameters in each bootstrap:", \
-        #         np.shape(boot_var_par)
-
-        if boot_var_par.all().phase is not np.nan:
-            sed_parameters = np.vstack((sed_parameters, boot_sed_parameters))
-            var_pars.append(boot_var_par)
+            all_parameters = np.vstack((all_parameters, boot_sed_parameters))
+            untied.append(boot_var_par)
         else:
-            print "It's nan:", i
             pass
 
-    sed_parameters = sed_parameters[1:]
-    # print sed_parameters.__str__()
-    # print var_pars
-    var_pars = np.asarray(var_pars)
-
-    print "Shape of varpars:", np.shape(var_pars)
+    all_parameters = all_parameters[1:]
+    print np.shape(all_parameters)
+    untied = np.asarray(untied)
+    # print untied
+    print np.shape(untied)
+    n_untied = np.shape(untied)[1]
     # print var_pars.__str__()
-    return var_pars
+    return untied, n_untied
 
 
 ################################################################################
-def avg_fit_func(var_pars, parfit_file, boot_num=2):
+def avg_best_fit(avg_untied, parfit_file, n_untied=3, boot_num=2):
     """
-    Gets the average of the fit function parameters from each bootstrap
+    Gets the average of the best-fit function parameters from each bootstrap
     iteration.
 
     Parameters
     ----------
-    var_pars : np.array of sed_pars.Parameter objects
-        1-D array of the SED parameters that vary with QPO phase.
+    avg_untied : np.array of sed_pars.Parameter objects
+        1-D array of the untied spectral parameters, averaged over bootstrap
+        iteration.
 
     parfit_file : str
         Full path of the "_funcfit.txt" file that was made in
         energy_spectra/multifit_plots.py and read in by ./fake_qpo_spectra.py.
 
+    n_untied : int
+        The number of untied spectral parameters in the model. [3]
+
     boot_num : int
-        Number of bootstrap iterations implemented.
+        Number of bootstrap iterations implemented. [2]
 
     Returns
     -------
-    var_pars : np.array of sed_pars.Parameter objects
+    avg_untied : np.array of sed_pars.Parameter objects
         Same as input, but with best_fit, func_fit, phase, and phase_err
         assigned.
 
     phase_points : np.array of floats
-        2-D array of the phases from each bootstrap, size = ()
+        2-D array of the phases from each bootstrap,
+        Size = (good bootstraps, number of untied parameters)
+
+    model_name : str
+        The name of the spectral model, used for printing on top of plots.
 
     """
-
-    for par in var_pars:
-        par.best_fit = np.zeros(5)
+    all_bestfits = np.zeros((n_untied, 5, 1))
 
     with open(parfit_file, 'r') as f:
+        j = 0
         for line in f:
             i = 0
+            boot_bestfit = np.zeros(5)
             line_element = line.strip().split("    ")
+            model_name = line_element[0][1:-1]
             for element in line_element[1:]:
                 if "[" in element or "]" in element or "," in element:
-                    # print "Best fit par before:", var_pars[i].best_fit
-                    boot_bestfit = np.array(element.replace('[',
+                    parameter_bestfit = np.array(element.replace('[',
                             '').replace(']', '').split(','), dtype=np.float)
-                    # print "Temp:", temp
-                    var_pars[i].best_fit = np.vstack((var_pars[i].best_fit,
-                            boot_bestfit))
-                    # print "Shape bf: ", np.shape(var_pars[i].best_fit)
-                    # print "Shape bf1: ", np.shape(var_pars[i].best_fit[1])
-                    # print "Phase:", boot_bestfit[1] / (2.0 * np.pi)
-                    var_pars[i].phase = np.append(var_pars[i].phase,
-                            boot_bestfit[1] / (2.0 * np.pi))
-                    # print "Shape of phase:", np.shape(var_pars[i].phase)
-                    # print "Best fit par after:", var_pars[i].best_fit
+                    boot_bestfit = np.vstack((boot_bestfit, parameter_bestfit))
                     i += 1
+            if np.isnan(boot_bestfit).any():
+                print "It's nan:, %d" % j
+            else:
+                all_bestfits = np.dstack((all_bestfits, boot_bestfit[1:,]))
+            j += 1
+    all_bestfits = all_bestfits[:,:,1:]
+    print np.shape(all_bestfits)
 
-    phase_points = np.zeros(boot_num)
-
-    for par in var_pars:
-        par.best_fit = np.mean(par.best_fit[1:boot_num+1,:], axis=0)
+    phase_points = np.zeros(np.shape(all_bestfits)[-1])
+    for par,i in zip(avg_untied, range(n_untied)):
+        par.best_fit = np.mean(all_bestfits[i,:,:], axis=-1)
         par.funcfit = fake_qpo_spectra.fit_function(np.arange(-0.02, 1.02,
                 0.01), par.best_fit)
-        phase_points = np.vstack((phase_points, par.phase[1:boot_num+1]))
-        par.phase_err = np.sqrt(np.var(par.phase[1:boot_num+1], ddof=1))
-        par.phase = np.mean(par.phase[1:boot_num+1])
-        print "\t", par.mod_name, par.par_name
-        print "Average phase:", par.phase
-        print "Err on phase:", par.phase_err
+        phase = all_bestfits[i,1,:] / (2.0 * np.pi)
+        phase_points = np.vstack((phase_points, phase))
+        par.phase = np.mean(phase)
+        par.phase_err = np.sqrt(np.var(phase, ddof=1))
+        print par.mod_name, par.par_name
+        print "\tAverage phase:", par.phase
+        print "\tErr on phase:", par.phase_err
 
-    # print np.shape(phase_points)
     phase_points = phase_points[1:,]
-    print "Shape of phase_points:", np.shape(phase_points)
 
-    return var_pars, phase_points
+    return avg_untied, phase_points, model_name
 
 
 ################################################################################
@@ -530,6 +574,8 @@ def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=2, testing=False,
             "_" + str(n_seconds) + "sec_adj.fits"
     lag_data_file = lag_dir + "/" + prefix + "_" + day + "_t" + str(dt_mult) + \
             "_" +str(n_seconds) + "sec_adj_lag.fits"
+    print lag_data_file
+
     epoch = 5
     out_rel_name = prefix + "_" + day + "_" + FIT_SPECIFIER
     out_rootname = out_dir + "/" + out_rel_name  # with no extension
@@ -569,33 +615,43 @@ def main(prefix="--", dt_mult=64, n_seconds=64, boot_num=2, testing=False,
     # ## Run fake_qpo_spectra.py
     # if os.path.isfile(parfit_file):
     #     fake_qpo_spectra.main(out_rootname, parfit_file, dt=dt, \
-    #             rsp_matrix=rsp_matrix, exposure=obs_time, test=testing)
+    #             rsp_matrix=rsp_matrix, exposure=obs_time, test=testing,
+    #             n_params=N_PARAMS)
     # else:
     #     print("\t ERROR: Parameter fit file does not exist: %s" % parfit_file)
     #     exit()
     # print "Finished fake_qpo_spectra"
 
-    ## Read in values of all varying parameters from the XSPEC log files
-    varying_parameters = read_all_log_files(es_dir, out_rel_name,
+    ## Read in values of all parameters from the XSPEC log files
+    untied_parameters, n_untied = read_xspec_log_files(es_dir, out_rel_name,
             boot_num=boot_num)
-    avg_var_pars, bad_boot = avg_boot_var_pars(varying_parameters,
+    avg_untied, bad_boot = avg_boot_var_pars(untied_parameters,
             boot_num=boot_num)
 
-    ## Compute the average fit function to those varying parameters
+
+    ## Compute the average fit function to the untied parameter variations
     ## Using boot_num-bad_boot as boot_num, because we're not counting the bad
     ## bootstrap runs.
-    avg_var_pars, phase_points = avg_fit_func(avg_var_pars, parfit_file,
-            boot_num=boot_num-bad_boot)
+    avg_untied, phase_points, model_name = avg_best_fit(avg_untied, parfit_file,
+            n_untied, boot_num=boot_num-bad_boot)
+
+    # print model_name
+    model_name = model_name.replace("phabs*", "phabs$\\times\\,$")
+    # print model_name
+    np.savetxt("%s_phasepoints.txt" % FIT_SPECIFIER, phase_points)
 
     ## Plot the "multi-fit" parameter variations to the average values
-    plot_final_multifit(avg_var_pars, out_rootname=out_rootname)
+    plot_final_multifit(avg_untied, out_rootname=out_rootname, title=model_name)
 
     ## Make contour plots of the phases
-    plot_phase_contours(phase_points, avg_var_pars, out_rootname=out_rootname)
-    plot_deltaphase_hist(phase_points, out_rootname=out_rootname)
+    plot_phase_contours(phase_points, avg_untied, out_rootname=out_rootname,
+            title=model_name)
+    plot_deltaphase_hist(phase_points, out_rootname=out_rootname,
+            title=model_name)
 
     ## Plot the simulated lag-energy vs the data
-    plot_final_lagenergy(lag_data_file, out_rootname=out_rootname)
+    plot_final_lagenergy(lag_data_file, out_rootname=out_rootname,
+            mod=model_name)
     print "Done!"
 
 
