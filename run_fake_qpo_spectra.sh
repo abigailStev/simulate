@@ -46,16 +46,16 @@ data_dir="$home_dir/Reduced_data/$prefix"
 rsp_matrix="${prefix}_PCU2.rsp"
 dump_file=dump.txt # Name of dumping file for intermediary steps
 
-#fit_specifier="1BB-Nicer"
+#fit_specifier="1BB-FS-G"
 #fit_specifier="1BB-FS-G-Tin-fzs-fzNbb"
 #fit_specifier="2BB-FS-G-kT"
 echo Fit specifier: "$fit_specifier"
-#n_spectra=24
-#n_params=9
+n_spectra=24
+n_params=9
 #echo "$n_spectra"
 #echo "$n_params"
 
-parfit_file="$es_dir/${prefix}_${day}_${fit_specifier}_sines.txt"
+parfit_file="$es_dir/${prefix}_${day}_${fit_specifier}_funcfit.txt"
 ccf_file="$ccf_dir/${prefix}_${day}_t${dt_mult}_${numsec}sec_adj.fits"
 
 #prefix="FAKE-NICER"
