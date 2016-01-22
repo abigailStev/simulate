@@ -99,7 +99,7 @@ def average_of_parameter(temp_stack):
         1-D array of averaged parameter values.
     """
     # print "Before:", np.shape(temp_stack)
-    temp_stack = np.average(temp_stack[1:,:], axis=0)
+    temp_stack = np.nanmean(temp_stack[1:,:], axis=0)
     # print "After:", np.shape(temp_stack)
     # print temp_stack
 
@@ -554,7 +554,7 @@ def make_lagspectrum(out_root, prefix):
 
 ################################################################################
 def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
-        n_seg=198, n_chans=64, exposure=13224.3984375, n_spectra=24, n_params=9,
+        n_seg=198, n_chans=64, exposure=13224.3984375, n_spectra=24, n_params=11,
         epoch=5, rsp_matrix="PCU2.rsp", test=False, psd_flag=False):
     """
     Main of fake_qpo_spectra.py
