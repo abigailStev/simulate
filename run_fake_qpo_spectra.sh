@@ -13,7 +13,7 @@
 ## Notes: HEASOFT 6.11.*, bash 3.*, and Python 2.7.* (with supporting libraries)
 ## 		  must be installed in order to run this script.
 ##
-## Written by Abigail Stevens, A.L.Stevens at uva.nl, 2015
+## Written by Abigail Stevens <A.L.Stevens at uva.nl>, 2015-2016
 ##
 ################################################################################
 
@@ -46,8 +46,8 @@ data_dir="$home_dir/Reduced_data/$prefix"
 rsp_matrix="${prefix}_PCU2.rsp"
 dump_file=dump.txt # Name of dumping file for intermediary steps
 
-#fit_specifier="1BB-FS-G"
-#fit_specifier="1BB-FS-G-Tin-fzs-fzNbb"
+#fit_specifier="1BB-FS-G-E-fzs"
+fit_specifier="1BB-FS-G-Tin-fzs-fzNbb"
 #fit_specifier="2BB-FS-G-kT"
 echo Fit specifier: "$fit_specifier"
 n_spectra=24
