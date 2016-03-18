@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """
 Makes fake QPO energy-dependent light curves and does spectral-timing (power
-spectrum, ccf, and lag-energy spectra) from a set of SED parameters (either tied
-value of parameters of best-fit function to the parameter variation with QPO-
-phase), from energy_spectra/multifit_plots.py.
+spectrum, ccf, and lag-energy spectra) from a set of spectral parameters (either
+tied value of parameters of best-fit function to the parameter variation with
+QPO phase), from energy_spectra/multifit_plots.py.
 
 Notes: HEASOFT 6.11.* and Python 2.7.* (with supporting libraries) must be
 installed in order to run this script.
@@ -35,7 +35,7 @@ import tools  ## in whizzy_scripts
 import ccf_lightcurves as ccf_lc  ## in cross_correlation
 
 __author__ = 'Abigail Stevens <A.L.Stevens at uva.nl>'
-__year__ = "2015"
+__year__ = "2015-2016"
 
 class Parameter(object):
     """
@@ -60,8 +60,8 @@ class Parameter(object):
 ################################################################################
 def fit_function(t, p):
     """
-    Computing a function to fit to the SED parameter variations. This is exactly
-    the same as what's in energy_spectra/multifit_plots.py.
+    Computing a function to fit to the spectral parameter variations. This is
+    exactly the same as what's in energy_spectra/multifit_plots.py.
 
     Parameters
     ----------
@@ -117,19 +117,20 @@ def read_parameters(funcfit_file, n_spectra, n_params):
         The full path of the file with the best-fitting function parameters.
 
     n_spectra : int
-        The number of QPO phase-resolved SEDs that were simultaneously fit,
+        The number of QPO phase-resolved spectra that were simultaneously fit,
         i.e. the number of x-axis points for the fit function.
 
     n_params : int
-        The number of SED parameters for all models for one data set.
+        The number of spectral parameters for all models for one data set.
 
     Returns
     -------
     np.array of Parameter objects
-        1-D array (size=n_params) of all the SED parameters for one data set.
+        1-D array (size=n_params) of all the spectral parameters for one data
+        set.
 
     str
-        The SED model as fed into XSPEC, with no spaces.
+        The spectral model as fed into XSPEC, with no spaces.
     """
 
     tinybins = np.arange(0, 1.0, 0.01)
@@ -141,8 +142,8 @@ def read_parameters(funcfit_file, n_spectra, n_params):
 
         for line in f:
             line_element = line.strip().split("    ")
-            model.append(line_element[0])
-            assert line_element[0] == model[0]
+            model.append(line_element[0].replace('"', ''))
+            assert line_element[0].replace('"', '') == model[0]
 
             for (element, i) in zip(line_element[1:], range(n_params)):
                 if "[" in element or "]" in element or "," in element:
@@ -180,29 +181,29 @@ def read_parameters(funcfit_file, n_spectra, n_params):
             component.value = average_of_parameter(component.value)
             # print component.value
 
-    print("SED model: %s" % model[0])
+    print("Spectral model: %s" % model[0])
     return parameters, model[0]
 
 
 ################################################################################
 def run_fakeit(parameters, model, exposure, n_spectra, out_root, rsp_matrix):
     """
-    Makes fake SED for each time bin of the QPO phase with the HEAsoft FTOOL
-    "fakeit".
+    Makes fake energy spectra for each time bin of the QPO phase with the
+    HEASOFT FTOOL "fakeit".
 
     Parameters
     ----------
     parameters : list of Parameter objects
-        List of SED parameters.
+        List of spectral parameters.
 
     model : str
-        The full SED model to fake.
+        The full spectral model to fake.
 
     exposure : float
         Total exposure time of the observation, in seconds.
 
     n_spectra : int
-        Total number of SEDs per QPO phase to make/use.
+        Total number of spectra per QPO phase to make/use.
 
     out_root : str
         Root of name of the output file (i.e., without extension).
@@ -210,7 +211,7 @@ def run_fakeit(parameters, model, exposure, n_spectra, out_root, rsp_matrix):
     Returns
     -------
     fake_spec_list : list of strings
-        The file names of the fake SEDs created.
+        The file names of the fake spectra created.
     """
 
     fake_spec_list = []
@@ -266,7 +267,7 @@ def run_fakeit(parameters, model, exposure, n_spectra, out_root, rsp_matrix):
             fake_spec_list.append("%s/%s" % (out_dir, fake_spec))
             # print tools.get_key_val(fake_spec, 1, "POISSERR")
         else:
-            warnings.warn("Fake SED #%d doesn't exist. Exiting." % \
+            warnings.warn("Fake spectrum #%d doesn't exist. Exiting." % \
                     spec_num, RuntimeWarning)
             exit()
 
@@ -411,6 +412,8 @@ def make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix,
     print "Rms float:", float(ref.rms)
     print "Rms:", ref.rms
     print type(ref.rms)
+    print "OUT FILE:", out_file
+
     xcor.fits_out(out_file, prefix, " ", meta_dict, ci.mean_rate, ref.mean_rate,
             float(ref.rms), ccf_avg, ccf_error, -1, -1, "Simulated CCF")
 
@@ -472,8 +475,8 @@ def chisquared_lagspectrum(data_file, sim_file):
         with the data's lag-energy spectrum.
 
     dof : float
-        The relevant degrees of freedom (number of data points + number of
-        simulation data points).
+        The relevant degrees of freedom (number of data points  - free fit
+        parameters).
 
     """
 
@@ -505,7 +508,7 @@ def chisquared_lagspectrum(data_file, sim_file):
     resids = np.square(data_lag - sim_lag) / np.square(data_err)
     chisquared = np.sum(resids)
 
-    return chisquared, len(data_lag) + len(sim_lag)
+    return chisquared, len(data_lag)
 
 
 ################################################################################
@@ -566,7 +569,7 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
 
     funcfit_file : str
         The full path of the text file containing the fit function parameters
-        of the SED parameter variations.
+        of the spectral parameter variations.
 
     prefix : str
         The identifying prefix of the data. Should have 'FAKE' in it for
@@ -588,10 +591,10 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
         The exposure time of the fake observation. [13224.3984375]
 
     n_spectra : int
-        Number of phase-resolved SEDs per QPO phase. [24]
+        Number of phase-resolved spectra per QPO phase. [24]
 
     n_params : int
-        Total number of parameters in one SED. [9]
+        Total number of parameters in one energy spectrum. [9]
 
     epoch : int
         RXTE observation epoch (affects the keV energy of the detector channels,
@@ -635,13 +638,13 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     # print(meta_dict)
     print_seg = 20
 
-    ############################################################
-    ## Reading in SED parameters from the text file
-    ############################################################
+    ##################################################################
+    ## Reading in energy spectral parameter values from the text file
+    ##################################################################
     parameters, model = read_parameters(funcfit_file, n_spectra, n_params)
 
     #############################################
-    ## Making fake SED for one period
+    ## Making fake energy spectra for one period
     #############################################
     fake_spec_list = run_fakeit(parameters, model, meta_dict['exposure'], \
             n_spectra, out_root, rsp_matrix)
@@ -652,7 +655,7 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
 
         single_spectrum = simlc.read_fakeit_spectra(spec_file)
         assert len(single_spectrum) == n_chans, "ERROR: Channels of fake "\
-                "SED do not match the expected detector energy"\
+                "spectrum do not match the expected detector energy"\
                 " channels."
         spectra[n_spec, :] = single_spectrum
 
@@ -770,9 +773,9 @@ def main(out_root, funcfit_file, prefix="GX339-BQPO", n_bins=8192, dt=0.0078125,
     make_crosscorrelation(cross_spec_array, ci, ref, meta_dict, prefix,
             out_root)
 
-    ##################################################
-    ## Making a lag-energy and lag_frequency spectrum
-    ##################################################
+    ############################################
+    ## Computing energy lags and frequency lags
+    ############################################
 
     make_lagspectrum(out_root, prefix)
 
@@ -793,7 +796,7 @@ if __name__ == "__main__":
             "the different outputs to.")
 
     parser.add_argument('funcfitfile', help="Full path of the text file with "\
-            "the best-fitting function paramters of the varying SED "\
+            "the best-fitting function paramters of the varying spectral "\
             "parameters.")
 
     parser.add_argument('--prefix', dest='prefix', help="Identifying prefix of"\
@@ -804,33 +807,32 @@ if __name__ == "__main__":
             "Fourier segment. Must be a power of 2, positive, integer. [8192]")
 
     parser.add_argument('--dt', type=tools.type_positive_float,
-            default=0.0078125,
-            dest='dt', help="Timestep between bins, in seconds. [0.0078125]")
+            default=0.0078125, dest='dt',
+            help="Timestep between bins, in seconds. [0.0078125]")
 
     parser.add_argument('-g', '--n_seg', type=tools.type_positive_int,
             default=198, dest='n_seg', help="Number of segments to compute. "\
             "[198]")
 
     parser.add_argument('-s', '--n_spec', type=tools.type_positive_int,
-            default=24, dest='n_spectra', help="Number of SED per QPO phase. "\
-            "[24]")
+            default=24, dest='n_spectra', help="Number of spectra per QPO "\
+            "phase. [24]")
 
     parser.add_argument('--n_par', type=tools.type_positive_int, default=9,
             dest='n_params', help="Total number of spectral parameters per "\
-            "SED. [9]")
+            "energy spectrum. [9]")
 
     parser.add_argument('-c', '--chan', type=tools.type_positive_int,
             default=64, dest='n_chans', help="Number of detector energy "\
             "channels for the data mode used for real data. [64]")
 
     parser.add_argument('-e', '--epoch', type=tools.type_positive_int,
-            default=5,
-            choices={1,2,3,4,5}, dest='epoch', help="RXTE observation epoch. "\
-            "[5]")
+            default=5, choices={1,2,3,4,5}, dest='epoch',
+            help="RXTE observation epoch. [5]")
 
     parser.add_argument('-x', '--exposure', type=tools.type_positive_float,
-            default=13224.0, \
-            dest='exposure', help="Exposure time of the simulated observation,"\
+            default=13224.0, dest='exposure',
+            help="Exposure time of the simulated observation,"\
             " in seconds. [13224.0]")
 
     parser.add_argument('--rsp', default="PCU2.rsp", dest='rsp_matrix',
