@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as font_manager
 from scipy import fftpack
 from multiprocessing import Pool, Array, Process
-from scipy.optimize import brentq, least_squares
 
 font_prop = font_manager.FontProperties(size=18)
 
@@ -162,7 +161,7 @@ def fit_for_d(true_psi, psi_m):
     chisq = np.sum(d_m ** 2)
     return chisq
 
-def for_each_h_test():
+def for_each_h_test(h_offset):
     # if h_offset < 0:
     #     print h_offset + np.pi
     # else:
@@ -286,30 +285,32 @@ def for_each_h_test():
     # There's a factor of pi/4 that needed to be subtracted to get the
     # answer back. Not clear where this comes from, but Phil found it too in
     # figuring out his method. Perhaps with how the FT is done?
-    diffs = np.append(diffs, edges_h[np.argmax(bins_h)])
-    true_psis = np.append(true_psis, many_psis[min_index])
 
-    if h_offset % 1 == 0:
+    if h_offset % 0.5 == 0:
         print "\t", h_offset
 
-
+    return edges_h[np.argmax(bins_h)] - 0.776137681159, many_psis[min_index] - 0.786838695652
 
 if __name__ == "__main__":
     # all_h_offsets = np.arange(-3, 3, 0.05)
     # all_h_offsets = np.arange(-3, 3, 1)
-    all_h_offsets = np.asarray([0.0, 0.3])
+    all_h_offsets = np.arange(0, 3.15, 0.05)
     diffs = np.asarray([])
     true_psis = np.asarray([])
 
-    p = multiprocessing.Pool(len(all_h_offsets))
+    for h_offset in all_h_offsets:
+        this_diff, this_true_psi = for_each_h_test(h_offset)
+        diffs = np.append(diffs, this_diff)
+        true_psis = np.append(true_psis, this_true_psi)
+
 
     print "Done!"
 
     out_tab = np.column_stack((all_h_offsets, diffs))
-    np.savetxt("psi_maxhistogram.txt", out_tab)
+    np.savetxt("psi_maxhistogram_min_const.txt", out_tab)
 
     out_tab = np.column_stack((all_h_offsets, true_psis))
-    np.savetxt("fitting_for_true_psis.txt", out_tab)
+    np.savetxt("fitting_for_true_psis_min_const.txt", out_tab)
 
 
     fig, ax = plt.subplots(1,1,figsize=(7,7))
@@ -317,21 +318,21 @@ if __name__ == "__main__":
     ax.set_xlim(-0.1, 3.1)
     ax.set_ylim(-0.1, 3.1)
     ax.grid(b=True, which='major', color='gray', linestyle='-')
-    ax.set_title("Bin of max histogram value")
+    ax.set_title("Bin of max histogram value", fontproperties=font_prop)
     ax.set_xlabel("Original harmonic offset, mod pi", fontproperties=font_prop)
     ax.set_ylabel("Measured phase difference, mod pi", fontproperties=font_prop)
-    plt.savefig("psi_maxhistogram.png", dpi=300)
+    plt.savefig("psi_maxhistogram_min_const.png", dpi=300)
     plt.close()
-    print "psi_maxhistogram.png"
+    print "psi_maxhistogram_min_const.png"
 
     fig, ax = plt.subplots(1,1,figsize=(7,7))
     ax.scatter(all_h_offsets % np.pi, true_psis)
     ax.set_xlim(-0.1, 3.1)
     ax.set_ylim(-0.1, 3.1)
     ax.grid(b=True, which='major', color='gray', linestyle='-')
-    ax.set_title("Fitting for true psi")
+    ax.set_title("Fitting for true psi", fontproperties=font_prop)
     ax.set_xlabel("Original harmonic offset, mod pi", fontproperties=font_prop)
     ax.set_ylabel("Measured phase difference, mod pi", fontproperties=font_prop)
-    plt.savefig("fitting_for_true_psis.png", dpi=300)
+    plt.savefig("fitting_for_true_psis_min_const.png", dpi=300)
     plt.close()
-    print "fitting_for_true_psis.png"
+    print "fitting_for_true_psis_min_const.png"
