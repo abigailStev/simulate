@@ -5,6 +5,9 @@ spectral-timing techniques in the repos power_spectra, cross_correlation, and
 lag_spectra. Please see [Stevens & Uttley 2016](https://ui.adsabs.harvard.edu/#abs/2016MNRAS.460.2796S/abstract)
 for reference.
 
+The functionality of this software will be folded into [Stingray](http://stingraysoftware.github.io/),
+so please get involved over there!
+
 ## Contents
 
 ### error_covariance.ipynb
